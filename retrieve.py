@@ -1,0 +1,204 @@
+'''
+TODO:
+'''
+
+import os
+import random
+import numpy as np
+from tqdm import tqdm
+import time
+
+import matplotlib.pyplot as plt
+from PIL import Image
+
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+
+import datasets
+import model as M
+import transformer
+from option import Options
+
+import matching as matching
+
+# global variable
+best_pred = 0.0
+acclist_train = []
+acclist_val = []
+
+TOP_N = 5
+RESULT_PATH = '/home/ace19/dl_result/image_retrieve/_result'
+
+
+def _print_distances(distance_matrix, top_n_indice):
+    distances = []
+    num_row, num_col = top_n_indice.shape
+    for r in range(num_row):
+        col = []
+        for c in range(num_col):
+            col.append(distance_matrix[r, top_n_indice[r, c]])
+        distances.append(col)
+
+    return distances
+
+
+def match_n(top_n, galleries, queries):
+    # The distance metric used for measurement to query.
+    metric = matching.NearestNeighborDistanceMetric("cosine")
+    start = time.time()
+    distance_matrix = metric.distance(queries, galleries)
+    end = time.time()
+    print("distance measure time: {}".format(end - start))
+
+    # top_indice = np.argmin(distance_matrix, axis=1)
+    # top_n_indice = np.argpartition(distance_matrix, top_n, axis=1)[:, :top_n]
+    # top_n_dist = _print_distances(distance_matrix, top_n_indice)
+    # top_n_indice2 = np.argsort(top_n_dist, axis=1)
+    # dist2 = _print_distances(distance_matrix, top_n_indice2)
+
+    # TODO: need improvement.
+    top_n_indice = np.argsort(distance_matrix, axis=1)[:, :top_n]
+    top_n_distance = _print_distances(distance_matrix, top_n_indice)
+
+    return top_n_indice, top_n_distance
+
+
+def show_retrieval_result(top_n_indice, top_n_distance, gallery_path_list, query_path_list):
+    col = top_n_indice.shape[1]
+    for row_idx, query_img_path in enumerate(query_path_list):
+        fig, axes = plt.subplots(ncols=6, figsize=(15, 4))
+        # fig.suptitle(query_img_path.split('/')[-1], fontsize=12, fontweight='bold')
+        axes[0].set_title(query_img_path.split('/')[-1], color='r', fontweight='bold')
+        axes[0].imshow(Image.open(query_img_path))
+
+        for i in range(col):
+            img_path = gallery_path_list[top_n_indice[row_idx, i]]
+            axes[i + 1].set_title(img_path.split('/')[-1])
+            axes[i + 1].imshow(Image.open(img_path))
+        # plt.show()
+        print(" Retrieval result {} create.".format(row_idx + 1))
+        fig.savefig(os.path.join(RESULT_PATH, query_img_path.split('/')[-1]))
+        plt.close()
+
+
+def main():
+    # init the args
+    global best_pred, acclist_train, acclist_val
+    args = Options().parse()
+
+    args.cuda = not args.no_cuda and torch.cuda.is_available()
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if args.cuda:
+        torch.cuda.manual_seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+
+    galleryset = datasets.get_dataset(data_dir=args.dataset_root,
+                                      csv=['test.csv'],
+                                      transform=transformer.test_augmentation())
+    queryset = datasets.get_dataset(data_dir=args.dataset_root,
+                                    csv=['test.csv'],
+                                    transform=transformer.test_augmentation())
+    gallery_loader = DataLoader(
+        galleryset, batch_size=args.batch_size, num_workers=args.workers)
+    query_loader = torch.utils.data.DataLoader(
+        queryset, batch_size=args.test_batch_size, num_workers=args.workers)
+
+    # init the model
+    model = M.Model(backbone=args.model)
+    # model.half()  # to save space.
+    print('\n-------------- model details --------------')
+    print(model)
+
+    if args.cuda:
+        model.cuda()
+        # Please use CUDA_VISIBLE_DEVICES to control the number of gpus
+        model = nn.DataParallel(model)
+
+    # check point
+    if args.checkpoint is not None:
+        if os.path.isfile(args.checkpoint):
+            print("=> loading checkpoint '{}'".format(args.checkpoint))
+            checkpoint = torch.load(args.checkpoint)
+            args.start_epoch = checkpoint['epoch'] + 1
+            best_pred = checkpoint['best_pred']
+            acclist_train = checkpoint['acclist_train']
+            acclist_val = checkpoint['acclist_val']
+            model.module.load_state_dict(checkpoint['state_dict'])
+            print("=> loaded checkpoint '{}' (epoch {})"
+                  .format(args.checkpoint, checkpoint['epoch']))
+        else:
+            raise RuntimeError("=> no infer checkpoint found at '{}'". \
+                               format(args.checkpoint))
+    else:
+        raise RuntimeError("=> config \'args.checkpoint\' is '{}'". \
+                           format(args.checkpoint))
+
+    gallery_features_list = []
+    gallery_path_list = []
+    query_features_list = []
+    query_path_list = []
+
+    def retrieval():
+        model.eval()
+
+        print(" ==> Loading gallery ... ")
+        tbar = tqdm(gallery_loader, desc='\r')
+        for batch_idx, (gallery_paths, data, gt) in enumerate(tbar):
+            if args.cuda:
+                data, gt = data.cuda(), gt.cuda()
+
+            with torch.no_grad():
+                # features [256, 2048]
+                # output [256, 128]
+                # features, output = model(data)
+
+                # TTA
+                batch_size, n_crops, c, h, w = data.size()
+                # fuse batch size and ncrops
+                features, _ = model(data.view(-1, c, h, w))
+                # avg over crops
+                features = features.view(batch_size, n_crops, -1).mean(1)
+                gallery_features_list.extend(features)
+                gallery_path_list.extend(gallery_paths)
+        # end of for
+
+        print(" ==> Loading query ... ")
+        tbar = tqdm(query_loader, desc='\r')
+        for batch_idx, (query_paths, data) in enumerate(tbar):
+            if args.cuda:
+                data = data.cuda()
+
+            with torch.no_grad():
+                # TTA
+                batch_size, n_crops, c, h, w = data.size()
+                # fuse batch size and ncrops
+                features, _ = model(data.view(-1, c, h, w))
+                # avg over crops
+                features = features.view(batch_size, n_crops, -1).mean(1)
+                query_features_list.extend(features)
+                query_path_list.extend(query_paths)
+        # end of for
+
+        if len(query_features_list) == 0:
+            print('No query data!!')
+            return
+
+        # matching
+        top_n_indice, top_n_distance = \
+            match_n(TOP_N,
+                    torch.stack(gallery_features_list).cpu(),
+                    torch.stack(query_features_list).cpu())
+
+        # Show n images from the gallery similar to the query image.
+        show_retrieval_result(top_n_indice, top_n_distance, gallery_path_list, query_path_list)
+
+    retrieval()
+
+
+if __name__ == "__main__":
+    main()
