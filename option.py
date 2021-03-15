@@ -17,16 +17,16 @@ class Options():
         parser.add_argument('--dataset', type=str, default='cassava',
                             help='training dataset')
         # model params
-        parser.add_argument('--model', type=str, default='seresnext50_32x4d',
+        parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
                             help='network model type (default: seresnext50_32x4d)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
         # parser.add_argument('--widen', type=int, default=4, metavar='N',
         #     help='widen factor of the network (default: 4)')
         # training hyper params
-        parser.add_argument('--batch-size', type=int, default=32,
+        parser.add_argument('--batch-size', type=int, default=64,
                             metavar='N', help='batch size for training (default: 128)')
-        parser.add_argument('--test-batch-size', type=int, default=32,
+        parser.add_argument('--test-batch-size', type=int, default=64,
                             metavar='N', help='batch size for testing (default: 256)')
         parser.add_argument('--epochs', type=int, default=30, metavar='N',
                             help='number of epochs to train (default: 600)')
@@ -55,11 +55,11 @@ class Options():
                             help='random seed (default: 1)')
         # checking point
         parser.add_argument('--resume', type=str,
-                            default=None,
+                            # default=None,
                             # default='pre-trained/noisy-student-efficientnet-b2.pth',
                             # 'efficientnet-b7_ns_aa-original-mstd0.5_re_100k_v4_cad79a/snapshot_100000.fp16.pth',
-                            # default='experiments/cassava-leaf-disease-classification/tf_efficientnet_b4_ns/'
-                            #         '(2021-02-03_01:10:15)cassava-leaf-disease-classification_512x512_tf_efficientnet_b4_ns_acc(84.66087)_loss(0.03182)_checkpoint9.pth.tar',
+                            default='experiments/shopee-product-matching/tf_efficientnet_b4_ns/'
+                                    '(2021-03-15_01:31:23)cassava_fold3_260x260_tf_efficientnet_b4_ns_acc(53.28467)_loss(0.12954)_checkpoint20.pth.tar',
                             help='put the path to resuming file if needed')
         parser.add_argument('--checkpoint_name', type=str, default='cassava',
                             help='set the checkpoint name')

@@ -23,8 +23,8 @@ normalize = Normalize(mean=[0.485, 0.456, 0.406],
 # normalize = Normalize(mean=[0.5, 0.5, 0.5],
 #                       std=[0.5, 0.5, 0.5])
 
-CROP_HEIGHT = 512  # 576
-CROP_WIDTH = 512
+CROP_HEIGHT = 260  # 576
+CROP_WIDTH = 260
 
 _, rand_augment, _ = transforms_imagenet_train((CROP_HEIGHT, CROP_WIDTH),
                                                auto_augment='original-mstd0.5',
@@ -95,34 +95,18 @@ class VisionTransform(ImageOnlyTransform):
         return ("transform")
 
 
-# https://dacon.io/competitions/official/235655/talkboard/401592?page=1&dtype=recent&ptype=pub
-# color, edge smoothing
-# 해상도 불일치, Color inconsistency, smoothness, 얼굴 pose 등의 특징을 찾을 수 있도록 학습
 def training_augmentation3():
     # train_transform = [
     #     # transforms.Resize((CROP_HEIGHT, CROP_WIDTH)),
     #     transforms.CenterCrop((CROP_HEIGHT, CROP_WIDTH)),
     #     transforms.RandomHorizontalFlip(),
+    #     transforms.ColorJitter(brightness=0.1, contrast=0.1, ),
     #     # AutoAugment(),
     #     transforms.ToTensor(),
     #     # imagenet norm
     #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
     #                          std=[0.229, 0.224, 0.225]),
-    # ]
-    # return transforms.Compose(train_transform)
-
-    # train_transform = [
-    #     transforms.Resize((CROP_HEIGHT, CROP_WIDTH)),
-    #     transforms.RandomHorizontalFlip(),
-    #     transforms.ColorJitter(brightness=0.1, contrast=0.1, ),
-    #     # transforms.ToTensor(),
-    #     # transforms.Normalize(mean=[0.485, 0.456, 0.406],
-    #     #                      std=[0.229, 0.224, 0.225]),
     #     Cutout(n_holes=8, length=10),
-    #     # TTA
-    #     FiveCrop(288),
-    #     # returns a 4D tensor
-    #     Lambda(lambda crops: torch.stack([normalize(ToTensor()(crop)) for crop in crops])),
     # ]
     # return transforms.Compose(train_transform)
 
@@ -150,7 +134,7 @@ def training_augmentation3():
         A.RandomBrightnessContrast(brightness_limit=0.2, p=0.5),
         A.HueSaturationValue(p=0.5),
         A.ShiftScaleRotate(p=0.5),
-        A.CoarseDropout(max_holes=8, p=0.5),
+        A.CoarseDropout(max_holes=4, p=0.5),
         A.Normalize(),
         ToTensorV2(),
     ]

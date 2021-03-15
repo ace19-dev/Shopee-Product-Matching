@@ -343,7 +343,7 @@ def main():
                 # for t, p in zip(targets.view(-1), preds.view(-1)):
                 #     confusion_matrix[t.long(), p.long()] += 1
                 tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' %
-                                      (test_loss / float(total), correct / float(total)))
+                                     (test_loss / float(total), correct / float(total)))
 
         test_loss /= float(len(val_loader.dataset))
         test_acc = 100. * correct / float(len(val_loader.dataset))
@@ -374,11 +374,11 @@ def main():
             'best_pred': best_pred,
             'acc_lst_train': acc_lst_train,
             'acc_lst_val': acc_lst_val,
-        }, logger=logger, args=args, loss=test_loss, is_best=is_best,
+            }, logger=logger, args=args, loss=test_loss, is_best=is_best,
             image_size=IMAGE_SIZE, create_at=create_at, filename=args.checkpoint_name,
             foldname=valset.fold_name())
 
-    for train_filename, val_filename in zip(train_npzs, val_npzs):
+    for train_filename, val_filename in zip(train_npzs  , val_npzs):
         logger.info('****************************')
         logger.info('%s, training start.' % (train_filename.split('_')[1]))
         logger.info('****************************\n')
@@ -406,8 +406,6 @@ def main():
                                   csv=['train.csv'],
                                   mode='train',
                                   transform=transformer.training_augmentation3(),
-                                  # transform = transformer.training_augmentation2(),
-                                  # transform=transformer.training_augmentation(),
                                   )
         valset = ProductDataset(data_dir=args.dataset_root,
                                 fold=[val_filename],

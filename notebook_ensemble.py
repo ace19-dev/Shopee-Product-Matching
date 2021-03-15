@@ -11,8 +11,8 @@ from scipy.special import softmax
 
 ############## TODO:delete
 import transformer
-from datasets.cassava import NUM_CLASS, CassavaTestDataset
-from models import model as M
+from datasets.product import NUM_CLASS, ProductTestDataset
+import model as M
 # from models import model2 as M2
 from training.loss import *
 
@@ -64,7 +64,7 @@ if cuda:
     torch.cuda.manual_seed_all(seed)
 
 # init dataloader
-testset = CassavaTestDataset(dataset_root,
+testset = ProductTestDataset(dataset_root,
                              transform=transformer.test_augmentation())
 test_loader = torch.utils.data.DataLoader(testset,
                                           batch_size=1,
@@ -72,7 +72,7 @@ test_loader = torch.utils.data.DataLoader(testset,
                                           num_workers=workers,
                                           pin_memory=True)
 
-testset2 = CassavaTestDataset(dataset_root,
+testset2 = ProductTestDataset(dataset_root,
                              transform=transformer.test_augmentation2())
 test_loader2 = torch.utils.data.DataLoader(testset2,
                                           batch_size=1,

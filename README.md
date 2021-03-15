@@ -11,8 +11,16 @@ Kaggle Competition: Determine if two products are the same by their images
   - unique image phash:  28735
   - unique title:  33117
   - unique label group:  11014
-- 
+  
+# Things to think about.
+- big loss -> 클래스가 많아서? 상대적으로 낮은 validation loss -> 왜?
+- how to solve big label classification?
 
 # Trial
-- try image retrieval method.
+- try image retrieval model.
   - class num: 11014
+  - use train data for validate above model because test data was hidden.
+- find other model through some paper
+  - use ocr
+
+- 

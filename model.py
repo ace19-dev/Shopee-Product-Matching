@@ -133,8 +133,8 @@ class Model(nn.Module):
 
         # COSINE-SOFTMAX
         # feature_dim = x.size()[1]
-        x = x.view(-1, num_flat_features(x))  # torch.Size([64, 2048])
-        # x = F.dropout2d(x, p=0.1)
+        # x = x.view(-1, num_flat_features(x))
+        x = F.dropout2d(x, p=0.1)
         x = self.fc(x)
 
         features = x

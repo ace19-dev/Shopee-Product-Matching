@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import torch.utils.data as data
 
-# NUM_CLASS = 5
+NUM_CLASS = 11014
 
 
 class ProductDataset(data.Dataset):
@@ -33,12 +33,8 @@ class ProductDataset(data.Dataset):
         image = cv2.imread(image_path, cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # image = Image.fromarray(image)
-
         if self.transform is not None:
-            sample = self.transform(image=image)
-            image = sample['image']
-            # image = self.transform(image)
+            image = self.transform(image=image)['image']
 
         return image, self.labels[index], image_id, index
 
@@ -73,38 +69,31 @@ class ProductDataset(data.Dataset):
 
 
 class ProductTestDataset(data.Dataset):
-    def __init__(self, data_dir, transform=None):
+    def __init__(self, data_dir, csv, transform=None):
         self.data_dir = data_dir
+        self.csv = csv
         self.transform = transform
-        # self.images = self.read_test_dataset()
 
-        self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in ['sample_submission.csv']])
-        self.images = self.df['image_id'].values.tolist()
+        self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
+        self.images = self.df['image'].values.tolist()
+        self.labels = self.df['label'].values.tolist()
+        self.posting_id = self.df['posting_id'].values.tolist()
 
     def __getitem__(self, index):
-        image_id = os.path.join(self.data_dir, 'test_images', self.images[index])
-        # print('#####: ', image_id)
+        # TODO: will fix for test_images
+        image_path = os.path.join(self.data_dir, 'train_images', self.images[index])
+        # print('#####: ', image_path)
 
-        image = cv2.imread(image_id, cv2.IMREAD_COLOR)
+        image = cv2.imread(image_path, cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        # image = Image.fromarray(image)
 
         if self.transform is not None:
             image = self.transform(image=image)['image']
-            # image = self.transform(image)
 
-        return image, image_id
+        return image, self.posting_id[index], image_path, self.labels[index],
 
     def __len__(self):
         return len(self.images)
-
-    def read_test_dataset(self):
-        path = os.path.join(self.data_dir, 'test')
-        test_images = os.listdir(path)
-        test_images.sort()
-
-        return test_images
 
 
 def df_loc_by_list(df, key, values):
@@ -114,26 +103,3 @@ def df_loc_by_list(df, key, values):
     # df = df.reset_index()
     df = df.drop('sort', axis=1)
     return df
-
-
-def find_classes(dir):
-    classes = [d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d))]
-    classes.sort(reverse=True)
-    class_to_idx = {classes[i]: i for i in range(len(classes))}
-    return classes, class_to_idx
-
-
-def read_dataset(datadir, samples, class_to_idx):
-    images = []
-    labels = []
-
-    for img in samples:
-        image = os.path.join(datadir, img)
-        images.append(image)
-        labels.append(class_to_idx[img[:4]])
-
-    tmp = list(zip(images, labels))
-    random.shuffle(tmp)
-    images, labels = zip(*tmp)
-
-    return images, labels
