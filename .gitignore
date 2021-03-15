@@ -131,3 +131,4 @@ dmypy.json
 experiments/
 submit/
 tb_log/
+results/
