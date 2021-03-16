@@ -5,6 +5,7 @@ from PIL import Image
 
 import cv2
 import numpy as np
+import torch
 import torch.utils.data as data
 
 NUM_CLASS = 11014
@@ -23,6 +24,7 @@ class ProductDataset(data.Dataset):
         self.df = df_loc_by_list(self.df, 'posting_id', samples)
         self.images = self.df['image'].values.tolist()
         self.labels = self.df['label'].values.tolist()  # create 'label' by grouping 'label_group'
+        self.labels = [int(i) for i in self.labels]
         assert (len(self.images) == len(self.labels))
 
     def __getitem__(self, index):
@@ -36,7 +38,7 @@ class ProductDataset(data.Dataset):
         if self.transform is not None:
             image = self.transform(image=image)['image']
 
-        return image, self.labels[index], image_id, index
+        return image, self.labels[index], image_id
 
     # def __str__(self):
     #     label1 = (self.df['label'] == 0).sum()
@@ -76,7 +78,7 @@ class ProductTestDataset(data.Dataset):
 
         self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
         self.images = self.df['image'].values.tolist()
-        self.labels = self.df['label'].values.tolist()
+        # self.labels = self.df['label'].values.tolist()
         self.posting_id = self.df['posting_id'].values.tolist()
 
     def __getitem__(self, index):
@@ -90,7 +92,8 @@ class ProductTestDataset(data.Dataset):
         if self.transform is not None:
             image = self.transform(image=image)['image']
 
-        return image, self.posting_id[index], image_path, self.labels[index],
+        # return image, self.posting_id[index], image_path, self.labels[index],
+        return image, self.posting_id[index], image_path
 
     def __len__(self):
         return len(self.images)

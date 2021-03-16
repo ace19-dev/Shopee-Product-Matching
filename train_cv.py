@@ -138,7 +138,7 @@ def main():
 
         # last_time = time.time()
         tbar = tqdm(train_loader, desc='\r')
-        for batch_idx, (images, targets, fnames, indexs) in enumerate(tbar):
+        for batch_idx, (images, targets, fnames) in enumerate(tbar):
             scheduler(optimizer, batch_idx, epoch, best_pred)
 
             if args.cuda:
@@ -166,15 +166,6 @@ def main():
                 # compute output
                 _, outputs = model(images)
 
-                # # ------ TTA - --------
-                # batch_size, n_crops, c, h, w = images.size()
-                # # fuse batch size and ncrops
-                # outputs = model(images.view(-1, c, h, w))
-                # # avg over crops
-                # outputs = outputs.view(batch_size, n_crops, -1).mean(1)
-                # # max over crops
-                # # outputs = torch.max(outputs.view(batch_size, n_crops, -1), 1).values
-                # # --------------------
                 # loss = criterion(activations=outputs,
                 #                  labels=torch.nn.functional.one_hot(target_a),
                 #                  t1=0.5, t2=1.5) * lam + \
@@ -205,43 +196,6 @@ def main():
                     _, outputs = model(images)
                     # print('outputs:', outputs.shape)
                     # print('targets:', targets.shape)
-
-                    # TTA by - https://www.kaggle.com/japandata509/ensemble-resnext50-32x4d-efficientnet-0-903
-                    # def tta_inference_func(test_loader):
-                    #     model.eval()
-                    #     bar = tqdm(test_loader)
-                    #     PREDS = []
-                    #     LOGITS = []
-                    #
-                    #     with torch.no_grad():
-                    #         for batch_idx, images in enumerate(bar):
-                    #             x = images.to(device)
-                    #             x = torch.stack([x, x.flip(-1), x.flip(-2), x.flip(-1, -2),
-                    #                              x.transpose(-1, -2), x.transpose(-1, -2).flip(-1),
-                    #                              x.transpose(-1, -2).flip(-2), x.transpose(-1, -2).flip(-1, -2)], 0)
-                    #             x = x.view(-1, 3, image_size, image_size)
-                    #             logits = model(x)
-                    #             logits = logits.view(BATCH_SIZE, 8, -1).mean(1)
-                    #             PREDS += [torch.softmax(logits, 1).detach().cpu()]
-                    #             LOGITS.append(logits.cpu())
-                    #
-                    #         PREDS = torch.cat(PREDS).cpu().numpy()
-                    #
-                    #     return PREDS
-
-                    # # ------ TTA by transformer --------
-                    # # batch_size, n_crops, c, h, w = images.size()
-                    # images2 = five_crop(images, 256)
-                    # n_crops, batch_size, c, h, w = images2.size()
-                    # # fuse batch size and ncrops
-                    # outputs = model(images.view(-1, c, h, w))
-                    # # print(outputs.size())
-                    # # avg over crops
-                    # # outputs = outputs.view(batch_size, n_crops, -1).mean(1)
-                    # # print(outputs.size())
-                    # # max over crops
-                    # outputs = torch.max(outputs.view(batch_size, n_crops, -1), 1).values
-                    # # --------------------
 
                     # loss = criterion(activations=outputs,
                     #                  labels=torch.nn.functional.one_hot(targets),
@@ -298,7 +252,7 @@ def main():
         model.eval()
 
         tbar = tqdm(val_loader, desc='\r')
-        for batch_idx, (images, targets, fnames, indexs) in enumerate(tbar):
+        for batch_idx, (images, targets, fnames) in enumerate(tbar):
             if args.cuda:
                 images, targets = images.cuda(), targets.cuda()
 
@@ -456,11 +410,11 @@ def main():
         # https://github.com/fhopfmueller/bi-tempered-loss-pytorch
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
-        criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=11014, smoothing=0.1)
+        # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
+        #                                    num_cls=11014, smoothing=0.1)
 
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        # criterion = FocalLoss2()
+        criterion = FocalLoss2()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         # https://github.com/shengliu66/ELR

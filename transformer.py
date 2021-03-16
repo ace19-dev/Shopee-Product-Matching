@@ -23,8 +23,8 @@ normalize = Normalize(mean=[0.485, 0.456, 0.406],
 # normalize = Normalize(mean=[0.5, 0.5, 0.5],
 #                       std=[0.5, 0.5, 0.5])
 
-CROP_HEIGHT = 260  # 576
-CROP_WIDTH = 260
+CROP_HEIGHT = 380  # 576
+CROP_WIDTH = 380
 
 _, rand_augment, _ = transforms_imagenet_train((CROP_HEIGHT, CROP_WIDTH),
                                                auto_augment='original-mstd0.5',

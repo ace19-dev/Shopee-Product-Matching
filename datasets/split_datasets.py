@@ -23,18 +23,15 @@ from sklearn.utils import shuffle
 
 
 # TODO: modify
-def create_label():
-    train_df = pd.read_csv(os.path.join(args.source, 'train.csv'))
+def create_label_column():
+    train_df = pd.read_csv(os.path.join(args.source, 'train_ori.csv'))
 
-    train_df['label'] = 0
-
-    group = train_df.groupby(by=['label_group']).count().reset_index()
-    label_group_to_label = group['label_group'].to_dict()
-
-    for key, value in label_group_to_label.items():
-        row_index = train_df[train_df['label_group'] == value].index.values.tolist()
-        for idx in row_index:
-            train_df.loc[idx, 'label'] = int(key)
+    # https://www.kaggle.com/vicioussong/rapids-tfidfvectorizer-cv-0-734
+    label_group_to_label = train_df.groupby('label_group').posting_id.agg('unique').to_dict()
+    for lbl, (key, value) in enumerate(sorted(label_group_to_label.items())):
+        idxs = train_df.loc[train_df['posting_id'].isin(value)].index.tolist()
+        for idx in idxs:
+            train_df.loc[idx, 'label'] = lbl
 
     train_df.to_csv(os.path.join(args.source, 'train.csv'), index=False)
 
@@ -141,8 +138,8 @@ def main(args):
     # test_groupkfold()
 
     # reference on https://www.kaggle.com/reighns/groupkfold-efficientbnet
-    create_label()
-    split_train_val3()
+    create_label_column()
+    # split_train_val3()
 
     # temp
     # make_train_npy()

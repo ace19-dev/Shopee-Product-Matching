@@ -138,8 +138,8 @@ def match_n(top_n, galleries, queries):
 
 
 def show_retrieval_result(top_n_indice, top_n_distance,
-                          gallery_path_list, gallery_posid_list, gallery_label_list,
-                          query_path_list, query_posid_list, query_label_list):
+                          gallery_path_list, gallery_posid_list,
+                          query_path_list, query_posid_list):
 
     test_df = pd.read_csv("/home/ace19/dl_data/shopee-product-matching/sample_submission.csv")
     test_images = test_df['posting_id'].values.tolist()
@@ -210,11 +210,11 @@ def main():
     galleryset = ProductTestDataset(data_dir=args.dataset_root,
                                     csv=['test.csv'],
                                     transform=transformer.test_augmentation())
-    queryset = ProductTestDataset(data_dir=args.dataset_root,
-                                  csv=['test.csv'],
-                                  transform=transformer.test_augmentation())
+    # queryset = ProductTestDataset(data_dir=args.dataset_root,
+    #                               csv=['test.csv'],
+    #                               transform=transformer.test_augmentation())
     gallery_loader = torch.utils.data.DataLoader(galleryset, batch_size=1, num_workers=args.workers)
-    query_loader = torch.utils.data.DataLoader(queryset, batch_size=1, num_workers=args.workers)
+    # query_loader = torch.utils.data.DataLoader(queryset, batch_size=1, num_workers=args.workers)
 
     # init the model
     model = M.Model(backbone=args.model)
@@ -249,18 +249,18 @@ def main():
     gallery_features_list = []
     gallery_path_list = []
     gallery_posid_list = []
-    gallery_label_list = []
+    # gallery_label_list = []
     query_features_list = []
     query_path_list = []
     query_posid_list = []
-    query_label_list = []
+    # query_label_list = []
 
     def retrieval():
         model.eval()
 
         print(" ==> Loading gallery ... ")
         tbar = tqdm(gallery_loader, desc='\r')
-        for batch_idx, (data, pos_id, img_path, gt) in enumerate(tbar):
+        for batch_idx, (data, pos_id, img_path) in enumerate(tbar):
             if args.cuda:
                 data = data.cuda()
 
@@ -276,28 +276,33 @@ def main():
                 gallery_features_list.extend(features)
                 gallery_path_list.extend(img_path)
                 gallery_posid_list.extend(pos_id)
-                gallery_label_list.extend(gt)
+                # gallery_label_list.extend(gt)
         # end of for
 
-        print("\n ==> Loading query ... ")
-        tbar = tqdm(query_loader, desc='\r')
-        for batch_idx, (data, pos_id, img_path, gt) in enumerate(tbar):
-            if args.cuda:
-                data = data.cuda()
+        # print("\n ==> Loading query ... ")
+        # tbar = tqdm(query_loader, desc='\r')
+        # for batch_idx, (data, pos_id, img_path) in enumerate(tbar):
+        #     if args.cuda:
+        #         data = data.cuda()
+        #
+        #     with torch.no_grad():
+        #         features, output = model(data)
+        #         # # TTA
+        #         # batch_size, n_crops, c, h, w = data.size()
+        #         # # fuse batch size and ncrops
+        #         # features, _ = model(data.view(-1, c, h, w))
+        #         # # avg over crops
+        #         # features = features.view(batch_size, n_crops, -1).mean(1)
+        #         query_features_list.extend(features)
+        #         query_path_list.extend(img_path)
+        #         query_posid_list.extend(pos_id)
+        #         # query_label_list.extend(gt)
+        # # end of for
 
-            with torch.no_grad():
-                features, output = model(data)
-                # # TTA
-                # batch_size, n_crops, c, h, w = data.size()
-                # # fuse batch size and ncrops
-                # features, _ = model(data.view(-1, c, h, w))
-                # # avg over crops
-                # features = features.view(batch_size, n_crops, -1).mean(1)
-                query_features_list.extend(features)
-                query_path_list.extend(img_path)
-                query_posid_list.extend(pos_id)
-                query_label_list.extend(gt)
-        # end of for
+        print("\n ==> Copy query ... ")
+        query_features_list = gallery_features_list.copy()
+        query_path_list = gallery_path_list.copy()
+        query_posid_list = gallery_posid_list.copy()
 
         if len(query_features_list) == 0:
             print('No query data!!')
@@ -311,8 +316,8 @@ def main():
 
         # Show n images from the gallery similar to the query image.
         show_retrieval_result(top_n_indice, top_n_distance,
-                              gallery_path_list, gallery_posid_list, gallery_label_list,
-                              query_path_list, query_posid_list, query_label_list)
+                              gallery_path_list, gallery_posid_list,
+                              query_path_list, query_posid_list)
 
     retrieval()
 
