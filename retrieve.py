@@ -140,7 +140,6 @@ def match_n(top_n, galleries, queries):
 def show_retrieval_result(top_n_indice, top_n_distance,
                           gallery_path_list, gallery_posid_list,
                           query_path_list, query_posid_list):
-
     test_df = pd.read_csv("/home/ace19/dl_data/shopee-product-matching/sample_submission.csv")
     test_images = test_df['posting_id'].values.tolist()
 
@@ -253,6 +252,7 @@ def main():
     query_features_list = []
     query_path_list = []
     query_posid_list = []
+
     # query_label_list = []
 
     def retrieval():

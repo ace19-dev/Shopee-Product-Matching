@@ -80,7 +80,7 @@ class Options():
         #                     help='Input image path')
         parser.add_argument('--beta', default=0.8, type=float,
                             help='hyperparameter beta')
-        parser.add_argument('--cutmix_prob', default=0.7, type=float,
+        parser.add_argument('--cutmix_prob', default=0.5, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.9, type=float,
                             help='mixup interpolation coefficient (default: 1)')

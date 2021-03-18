@@ -139,7 +139,7 @@ def main(args):
 
     # reference on https://www.kaggle.com/reighns/groupkfold-efficientbnet
     create_label_column()
-    # split_train_val3()
+    split_train_val3()
 
     # temp
     # make_train_npy()

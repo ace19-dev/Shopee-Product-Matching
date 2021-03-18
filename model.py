@@ -55,7 +55,7 @@ class Model(nn.Module):
             in_channels = 512
         elif self.backbone in ['seresnext50_32x4d', 'resnext101_32x8d', 'resnext50_32x4d',
                                'resnest50d', 'resnest101e', 'resnest200e', 'resnet50',
-                               'resnest269e', 'resnet101', 'resnet152']:
+                               'resnest269e', 'resnet101', 'resnet152', 'resnest50d_4s2x40d']:
             in_channels = 2048
         elif self.backbone.startswith('tf_efficientnet_b0'):
             in_channels = 1280
@@ -74,37 +74,6 @@ class Model(nn.Module):
         self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
         self.fc = nn.Linear(in_channels, in_channels)
         self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
-
-    # def forward(self, x):
-    #     if self.backbone.startswith('tf_efficientnet'):
-    #         # x = self.pretrained.extract_features(x)
-    #         x = self.pretrained.conv_stem(x)
-    #         x = self.pretrained.bn1(x)
-    #         x = self.pretrained.act1(x)
-    #         x = self.pretrained.blocks(x)
-    #         x = self.pretrained.conv_head(x)
-    #         x = self.pretrained.bn2(x)
-    #         x = self.pretrained.act2(x)
-    #         # print(x.shape)
-    #         x = self.pretrained.global_pool(x)
-    #         return self.pretrained.classifier(x)
-    #
-    #     elif self.backbone.startswith('resnet') or \
-    #             self.backbone.startswith('resnext') or \
-    #             self.backbone.startswith('seresnext') or \
-    #             self.backbone.startswith('resnest'):
-    #         x = self.pretrained.conv1(x)
-    #         x = self.pretrained.bn1(x)
-    #         x = self.pretrained.act1(x)
-    #         x = self.pretrained.maxpool(x)
-    #         x = self.pretrained.layer1(x)
-    #         x = self.pretrained.layer2(x)
-    #         x = self.pretrained.layer3(x)
-    #         x = self.pretrained.layer4(x)
-    #         # x = self.pretrained.global_pool(x)
-    #
-    #     return self.head2(x)
-    #     # return self.head(x)
 
     def forward(self, x):
         if self.backbone.startswith('tf_efficientnet'):
@@ -134,7 +103,7 @@ class Model(nn.Module):
         # COSINE-SOFTMAX
         # feature_dim = x.size()[1]
         # x = x.view(-1, num_flat_features(x))
-        x = F.dropout2d(x, p=0.2)
+        x = F.dropout2d(x, p=0.1)
         x = self.fc(x)
 
         features = x
