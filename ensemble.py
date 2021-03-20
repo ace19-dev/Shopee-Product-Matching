@@ -48,7 +48,7 @@ def main():
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
 
-    testset = CassavaTestDataset(args.dataset_root,
+    testset = ProductTestDataset(args.dataset_root,
                                  transform=transformer.test_augmentation())
     test_loader = torch.utils.data.DataLoader(testset,
                                               batch_size=1,

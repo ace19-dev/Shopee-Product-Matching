@@ -255,6 +255,8 @@ def main():
 
     # query_label_list = []
 
+    from sklearn.neighbors import NearestNeighbors
+
     def retrieval():
         model.eval()
 

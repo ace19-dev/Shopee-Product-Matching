@@ -1,60 +1,430 @@
-from __future__ import print_function
-
-import inspect
+import argparse
 import os
-import random
-import collections
 
-import pandas as pd
-from tqdm import tqdm
-from scipy.special import softmax
-
-############## TODO:delete
-import transformer
-from datasets.product import NUM_CLASS, ProductTestDataset
-import model as M
-# from models import model2 as M2
-from training.loss import *
-
-# ############################
-
-global best_pred, acclist_train, acclist_val
-
-# global variable
-best_pred = 0.0
-acclist_train = []
-acclist_val = []
-
-__cwd__ = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-
-FOLD_MODELS = [
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns/(2021-03-04_13:28:50)cassava_fold0_576x576_tf_efficientnet_b4_ns_acc(80.57661)_loss(0.07819)_checkpoint1.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns/(2021-03-04_13:28:50)cassava_fold1_576x576_tf_efficientnet_b4_ns_acc(83.36722)_loss(0.07957)_checkpoint1.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns/(2021-03-04_13:28:50)cassava_fold2_576x576_tf_efficientnet_b4_ns_acc(81.70393)_loss(0.0773)_checkpoint1.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns/(2021-03-04_13:28:50)cassava_fold3_576x576_tf_efficientnet_b4_ns_acc(82.95749)_loss(0.07689)_checkpoint1.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns/(2021-03-04_13:28:50)cassava_fold4_576x576_tf_efficientnet_b4_ns_acc(80.00000)_loss(0.07863)_checkpoint1.pth.tar',
-]
-
-FOLD_MODELS_2 = [
-    'experiments/shopee-product-matching/tf_efficientnet_b5_ns/(2021-03-04_14:33:12)cassava_fold0_640x640_tf_efficientnet_b5_ns_acc(77.84143)_loss(0.09037)_checkpoint1.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b5_ns/(2021-03-04_14:33:12)cassava_fold1_640x640_tf_efficientnet_b5_ns_acc(79.98521)_loss(0.07774)_checkpoint1.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b5_ns/(2021-03-04_14:33:12)cassava_fold2_640x640_tf_efficientnet_b5_ns_acc(82.16595)_loss(0.07733)_checkpoint1.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b5_ns/(2021-03-04_14:33:12)cassava_fold3_640x640_tf_efficientnet_b5_ns_acc(82.66174)_loss(0.07624)_checkpoint1.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b5_ns/(2021-03-04_14:33:12)cassava_fold4_640x640_tf_efficientnet_b5_ns_acc(82.73567)_loss(0.0776)_checkpoint1.pth.tar',
-]
-
-# dataset_root = '/kaggle/input/shopee-product-matching'
 dataset_root = '/home/ace19/dl_data/shopee-product-matching'
-dataset_name = 'cassava'
-basemodel = 'tf_efficientnet_b4_ns'
-# basemodel = 'resnet50'
+dataset_name = 'product'
+modelname = 'tf_efficientnet_b4_ns'
 test_batch_size = 1
 workers = 4
 no_cuda = False
-# TODO: set random seed per ensemble
 seed = 8
 
+cls_resume = 'experiments/shopee-product-matching/tf_efficientnet_b4_ns/' \
+             '(2021-03-17_21:10:32)product_fold3_380x380_tf_efficientnet_b4_ns_acc(54.97810)_loss(0.26047)_checkpoint30.pth.tar'
+
+import cv2
+import numpy as np
+from PIL import Image
+
+import torch
+import torchvision.transforms as transforms
+from torchvision.transforms import TenCrop, FiveCrop, ToTensor, Lambda, Normalize
+
+import albumentations as A
+from albumentations import ImageOnlyTransform
+from albumentations import SmallestMaxSize, HorizontalFlip, Compose, RandomCrop
+from albumentations.pytorch import ToTensorV2
+
+from timm.data.transforms_factory import transforms_imagenet_train
+from timm.data.random_erasing import RandomErasing
+
+# imagenet
+normalize = Normalize(mean=[0.485, 0.456, 0.406],
+                      std=[0.229, 0.224, 0.225])
+
+CROP_HEIGHT = 380
+CROP_WIDTH = 380
+
+
+def test_augmentation():
+    test_transform = [
+        A.Resize(CROP_HEIGHT, CROP_WIDTH),
+        A.Normalize(),
+        ToTensorV2(),
+    ]
+    return A.Compose(test_transform)
+
+
+import torch.nn as nn
+
+import torch
+from torch.nn import functional as F
+import torchvision.models as torch_models
+
+import timm
+from pprint import pprint
+
+
+class Model(nn.Module):
+    def __init__(self, backbone, nclass=11014):
+        super(Model, self).__init__()
+        self.backbone = backbone
+        self.ncode = 32
+        #         self.nclass = nclass
+
+        model_names = timm.list_models(pretrained=True)
+        pprint(model_names)
+        self.pretrained = timm.create_model(self.backbone, pretrained=False, num_classes=nclass)
+        # Below code is used when if pretrained is False
+        pre_model = torch.load('/home/ace19/.cache/torch/checkpoints/tf_efficientnet_b4_ns-d6313a46.pth')
+        #         del pre_model['fc.weight']
+        #         del pre_model['fc.bias']
+        del pre_model['classifier.weight']
+        del pre_model['classifier.bias']
+        self.pretrained.load_state_dict(pre_model, strict=False)
+        #         self.pretrained.fc = nn.Linear(in_channels, nclass),
+
+        in_channels = 512  # resnet18, resnet34
+        if self.backbone in ['resnet18', 'resnet34', 'vgg16', 'vgg19']:
+            in_channels = 512
+        elif self.backbone in ['seresnext50_32x4d', 'resnext101_32x8d', 'resnext50_32x4d',
+                               'resnest50d', 'resnest101e', 'resnest200e', 'resnet50',
+                               'resnest269e', 'resnet101', 'resnet152']:
+            in_channels = 2048
+        elif self.backbone.startswith('tf_efficientnet_b0'):
+            in_channels = 1280
+        elif self.backbone.startswith('tf_efficientnet_b1'):
+            in_channels = 1280
+        elif self.backbone.startswith('tf_efficientnet_b2'):
+            in_channels = 1408
+        elif self.backbone.startswith('tf_efficientnet_b3'):
+            in_channels = 1536
+        elif self.backbone.startswith('tf_efficientnet_b4'):
+            in_channels = 1792
+        elif self.backbone.startswith('tf_efficientnet_b5'):
+            in_channels = 2048
+
+        self.weights = torch.nn.Parameter(torch.randn(in_channels, nclass))
+        self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
+        self.fc = nn.Linear(in_channels, in_channels)
+        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+
+    def forward(self, x):
+        if self.backbone.startswith('tf_efficientnet'):
+            x = self.pretrained.conv_stem(x)
+            x = self.pretrained.bn1(x)
+            x = self.pretrained.act1(x)
+            x = self.pretrained.blocks(x)
+            x = self.pretrained.conv_head(x)
+            x = self.pretrained.bn2(x)
+            x = self.pretrained.act2(x)
+            x = self.pretrained.global_pool(x)
+            # return self.pretrained.classifier(x)
+        elif self.backbone.startswith('resnet') or \
+                self.backbone.startswith('resnext') or \
+                self.backbone.startswith('seresnext') or \
+                self.backbone.startswith('resnest'):
+            x = self.pretrained.conv1(x)
+            x = self.pretrained.bn1(x)
+            x = self.pretrained.act1(x)
+            x = self.pretrained.maxpool(x)
+            x = self.pretrained.layer1(x)
+            x = self.pretrained.layer2(x)
+            x = self.pretrained.layer3(x)
+            x = self.pretrained.layer4(x)
+            x = self.pretrained.global_pool(x)
+
+        # COSINE-SOFTMAX
+        # feature_dim = x.size()[1]
+        # x = x.view(-1, num_flat_features(x))
+        x = F.dropout2d(x, p=0.1)
+        x = self.fc(x)
+
+        features = x
+        # Features in rows, normalize axis 1.
+        features = F.normalize(features, p=2, dim=1, eps=1e-8)
+
+        # Mean vectors in colums, normalize axis 0.
+        weights_normed = F.normalize(self.weights, p=2, dim=0, eps=1e-8)
+        logits = self.scale.cuda() * torch.mm(features.cuda(), weights_normed.cuda())  # torch.matmul
+
+        return features, logits
+
+
+import cv2
+import numpy as np
+import torch.utils.data as data
+
+
+class ProductTestDataset(data.Dataset):
+    def __init__(self, data_dir, csv, transform=None):
+        self.data_dir = data_dir
+        self.csv = csv
+        self.transform = transform
+
+        #         self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
+        df = csv
+        self.images = df['image'].values.tolist()
+        # self.labels = df['label'].values.tolist()
+        self.posting_id = df['posting_id'].values.tolist()
+
+    def __getitem__(self, index):
+        # TODO: will fix for test_images
+        image_path = os.path.join(self.data_dir, 'test_images', self.images[index])
+        # print('#####: ', image_path)
+
+        image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        if self.transform is not None:
+            image = self.transform(image=image)['image']
+
+        # return image, self.posting_id[index], image_path, self.labels[index],
+        return image, self.posting_id[index], image_path
+
+    def __len__(self):
+        return len(self.images)
+
+
+import numpy as np
+
+import torch.nn.functional as F
+
+
+def _pdist(a, b):
+    """Compute pair-wise squared distance between points in `a` and `b`.
+
+    Parameters
+    ----------
+    a : array_like
+        An NxM matrix of N samples of dimensionality M.
+    b : array_like
+        An LxM matrix of L samples of dimensionality M.
+
+    Returns
+    -------
+    ndarray
+        Returns a matrix of size len(a), len(b) such that element (i, j)
+        contains the squared distance between `a[i]` and `b[j]`.
+
+    """
+    a, b = np.asarray(a), np.asarray(b)
+    if len(a) == 0 or len(b) == 0:
+        return np.zeros((len(a), len(b)))
+    a2, b2 = np.square(a).sum(axis=1), np.square(b).sum(axis=1)
+    r2 = -2. * np.dot(a, b.T) + a2[:, None] + b2[None, :]
+    r2 = np.clip(r2, 0., float(np.inf))
+    return r2
+
+
+# TODO: modify
+def _cosine_distance(a, b, data_is_normalized=False):
+    """Compute pair-wise cosine distance between points in `a` and `b`.
+
+    Parameters
+    ----------
+    a : array_like
+        An NxM matrix of N samples of dimensionality M.
+    b : array_like
+        An LxM matrix of L samples of dimensionality M.
+    data_is_normalized : Optional[bool]
+        If True, assumes rows in a and b are unit length vectors.
+        Otherwise, a and b are explicitly normalized to lenght 1.
+
+    Returns
+    -------
+    ndarray
+        Returns a matrix of size len(a), len(b) such that element (i, j)
+        contains the squared distance between `a[i]` and `b[j]`.
+
+    """
+    # a = a.numpy()
+    # b = b.numpy()
+
+    if not data_is_normalized:
+        # To avoid RuntimeWarning: invalid value encountered in true_divide import numpy as np
+        # a_normed = F.normalize(a, p=2, dim=1, eps=1e-8)
+        a_normed = np.linalg.norm(a, axis=1, keepdims=True)
+        a = np.asarray(a) / np.where(a_normed == 0, 1, a_normed)
+        # b_normed = F.normalize(a, p=2, dim=1, eps=1e-8)
+        b_normed = np.linalg.norm(b, axis=1, keepdims=True)
+        b = np.asarray(b) / np.where(b_normed == 0, 1, b_normed)
+    else:
+        a = np.asarray(a)
+        b = np.asarray(b)
+
+    return 1. - np.dot(a, b.T)
+
+
+def _nn_euclidean_distance(x, y):
+    """ Helper function for nearest neighbor distance metric (Euclidean).
+
+    Parameters
+    ----------
+    x : ndarray
+        A matrix of N row-vectors (sample points).
+    y : ndarray
+        A matrix of M row-vectors (query points).
+
+    Returns
+    -------
+    ndarray
+        A vector of length M that contains for each entry in `y` the
+        smallest Euclidean distance to a sample in `x`.
+
+    """
+    distances = _pdist(x, y)
+    return np.maximum(0.0, distances.min(axis=0))
+
+
+def _nn_cosine_distance(x, y):
+    """ Helper function for nearest neighbor distance metric (cosine).
+
+    Parameters
+    ----------
+    x : ndarray
+        A matrix of M row-vectors (query points).
+    y : ndarray
+        A matrix of N row-vectors (gallery points).
+
+    Returns
+    -------
+    # ndarray
+    #     A vector of length M that contains for each entry in `y` the
+    #     smallest cosine distance to a sample in `x`.
+
+    """
+    distances = _cosine_distance(x, y)
+    return distances
+
+
+class NearestNeighborDistanceMetric(object):
+    """
+    A nearest neighbor distance metric that, for each target, returns
+    the closest distance to any sample that has been observed so far.
+
+    Parameters
+    ----------
+    metric : str
+        Either "euclidean" or "cosine".
+    matching_threshold: float
+        The matching threshold. Samples with larger distance are considered an
+        invalid match.
+    budget : Optional[int]
+        If not None, fix samples per class to at most this number. Removes
+        the oldest samples when the budget is reached.
+
+    Attributes
+    ----------
+    samples : Dict[int -> List[ndarray]]
+        A dictionary that maps from target identities to the list of samples
+        that have been observed so far.
+
+    """
+
+    def __init__(self, metric, matching_threshold=None, budget=None):
+        if metric == "euclidean":
+            self._metric = _nn_euclidean_distance
+        elif metric == "cosine":
+            self._metric = _nn_cosine_distance
+        else:
+            raise ValueError(
+                "Invalid metric; must be either 'euclidean' or 'cosine'")
+        self.matching_threshold = matching_threshold
+        self.budget = budget  # Gating threshold for cosine distance
+        self.samples = {}
+
+    def distance(self, queries, galleries):
+        """Compute distance between galleries and queries.
+
+        Parameters
+        ----------
+        queries : ndarray
+            An LxM matrix of L features of dimensionality M to match the given `galleries` against.
+        galleries : ndarray
+            An NxM matrix of N features of dimensionality M.
+
+        Returns
+        -------
+        ndarray
+            Returns a cost matrix of shape LxN
+
+        """
+        return self._metric(queries, galleries)
+
+
+def _print_distances(distance_matrix, top_n_indice):
+    distances = []
+    num_row, num_col = top_n_indice.shape
+    for r in range(num_row):
+        col = []
+        for c in range(num_col):
+            col.append(distance_matrix[r, top_n_indice[r, c]])
+        distances.append(col)
+
+    return distances
+
+
+# TODO: 특정 거리를 설정해서 top 50 top
+def match_n(top_n, galleries, queries):
+    # The distance metric used for measurement to query.
+    metric = NearestNeighborDistanceMetric("cosine")
+    start = time.time()
+    distance_matrix = metric.distance(queries, galleries)
+    end = time.time()
+    print("distance measure time: {}".format(end - start))
+
+    # top_indice = np.argmin(distance_matrix, axis=1)
+    # top_n_indice = np.argpartition(distance_matrix, top_n, axis=1)[:, :top_n]
+    # top_n_dist = _print_distances(distance_matrix, top_n_indice)
+    # top_n_indice2 = np.argsort(top_n_dist, axis=1)
+    # dist2 = _print_distances(distance_matrix, top_n_indice2)
+
+    # TODO: need improvement.
+    top_n_indice = np.argsort(distance_matrix, axis=1)[:, :top_n]
+    top_n_distance = _print_distances(distance_matrix, top_n_indice)
+
+    return top_n_indice, top_n_distance
+
+
+def show_retrieval_result(top_n_indice, top_n_distance,
+                          gallery_posid_list, query_posid_list):
+    #     submit_df = pd.read_csv("../input/shopee-product-matching/sample_submission.csv")
+    #     submit_images = submit_df['posting_id'].values.tolist()
+
+    query_posids = []
+    gallery_posids = []
+
+    col = top_n_indice.shape[1]
+    for row_idx, query_posid in enumerate(query_posid_list):
+        # query_posids.append(query_posid_list[row_idx])
+
+        posids = []
+        for i in range(col):
+            # TODO: fix
+            if top_n_distance[row_idx][i] < 1.0:
+                continue
+
+            posids.append(gallery_posid_list[top_n_indice[row_idx, i]])
+
+        gallery_posids.append(' '.join(posids))
+
+    return gallery_posids
+
+
+import csv
+import os
+import time
+import random
+import gc
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+NUM_CLASS = 11014
+TOP_N = 50
+
+# global variable
+best_pred = 0.0
+acc_lst_train = []
+acc_lst_val = []
+
 cuda = not no_cuda and torch.cuda.is_available()
+print(cuda)
 
 random.seed(seed)
 np.random.seed(seed)
@@ -63,169 +433,134 @@ if cuda:
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
-# init dataloader
-testset = ProductTestDataset(dataset_root,
-                             transform=transformer.test_augmentation())
-test_loader = torch.utils.data.DataLoader(testset,
-                                          batch_size=1,
-                                          shuffle=False,
-                                          num_workers=workers,
-                                          pin_memory=True)
+# galleryset = ProductTestDataset(data_dir=dataset_root,
+#                                     csv=['test.csv'],
+#                                     transform=test_augmentation())
+# queryset = ProductTestDataset(data_dir=dataset_root,
+#                               csv=['test.csv'],
+#                               transform=test_augmentation())
 
-testset2 = ProductTestDataset(dataset_root,
-                             transform=transformer.test_augmentation2())
-test_loader2 = torch.utils.data.DataLoader(testset2,
-                                          batch_size=1,
-                                          shuffle=False,
-                                          num_workers=workers,
-                                          pin_memory=True)
+# gallery_loader = torch.utils.data.DataLoader(galleryset, batch_size=8, num_workers=workers)
+# query_loader = torch.utils.data.DataLoader(queryset, batch_size=1, num_workers=workers)
 
 
-def inference_func(test_loader):
-    model.eval()
-    bar = tqdm(test_loader)
+# init the model
+model = Model(backbone=modelname)
+# model.half()  # to save space.
+print('\n-------------- model details --------------')
+print(model)
 
-    PREDS = []
-    PREDS2 = []
+if cuda:
+    model.cuda()
+    model = nn.DataParallel(model)
 
-    with torch.no_grad():
-        for batch_idx, (images, fnames) in enumerate(bar):
-            x = images.cuda()
-            logits = model(x)
-            PREDS2 += [torch.softmax(logits, dim=1).detach().cpu()]
-            PREDS += [logits.data.max(1)[1]]
-        PREDS = torch.cat(PREDS).cpu().numpy()
-        PREDS2 = torch.cat(PREDS2).cpu().numpy()
-    return PREDS, PREDS2
+if cls_resume is not None:
+    if os.path.isfile(cls_resume):
+        print("=> loading checkpoint '{}'".format(cls_resume))
+        checkpoint = torch.load(cls_resume)
+        start_epoch = checkpoint['epoch'] + 1
+        best_pred = checkpoint['best_pred']
+        acc_lst_train = checkpoint['acc_lst_train']
+        acc_lst_val = checkpoint['acc_lst_val']
+        model.load_state_dict(checkpoint['state_dict'])
+        print("=> loaded checkpoint '{}' (epoch {})".format(cls_resume, checkpoint['epoch']))
+    else:
+        raise RuntimeError("=> no cls_resume checkpoint found at '{}'".format(cls_resume))
+else:
+    raise RuntimeError("=> config \'cls_resume\' is '{}'".format(cls_resume))
 
+# gallery_features_list = []
+gallery_path_list = []
+gallery_posid_list = []
+query_features_list = []
+query_path_list = []
+query_posid_list = []
 
-def inference_func(test_loader, model, image_size, num_tta):
-    model.eval()
-    bar = tqdm(test_loader)
+model.eval()
 
-    PREDS = []
+test_df = pd.read_csv("/home/ace19/dl_data/shopee-product-matching/test.csv")
 
-    with torch.no_grad():
-        for batch_idx, (images, fnames) in enumerate(bar):
-            x = images.cuda()
+embeds = []
+embed_posids = []
 
-            if num_tta == 0:
-                logits = model(x)
-            elif num_tta == 4:
-                x = torch.stack([x, x.flip(-1), x.flip(-2), x.flip(-1, -2)], 0)
-                x = x.view(-1, 3, image_size, image_size)
-                logits = model(x)
-                logits = logits.view(test_batch_size, num_tta, -1).mean(1)
-            elif num_tta == 8:
-                x = torch.stack([x, x.flip(-1), x.flip(-2), x.flip(-1, -2),
-                                 x.transpose(-1, -2), x.transpose(-1, -2).flip(-1),
-                                 x.transpose(-1, -2).flip(-2), x.transpose(-1, -2).flip(-1, -2)], 0)
-                x = x.view(-1, 3, image_size, image_size)
-                logits = model(x)
-                logits = logits.view(test_batch_size, num_tta, -1).mean(1)
+CHUNK = 1024 * 4
+print('Computing image embeddings...')
+CTS = len(test_df) // CHUNK
 
-            # PREDS += [logits.data.max(1)[1]]
-            PREDS += [torch.softmax(logits, 1).detach().cpu()]
+if len(test_df) % CHUNK != 0:
+    CTS += 1
 
-        PREDS = torch.cat(PREDS).cpu().numpy()
+for i, j in enumerate(range(CTS)):
 
-    return PREDS
+    a = j * CHUNK
+    b = (j + 1) * CHUNK
+    b = min(b, len(test_df))
+    print('chunk', a, 'to', b)
 
+    galleryset = ProductTestDataset(data_dir=dataset_root,
+                                    csv=test_df.iloc[a:b],
+                                    transform=test_augmentation())
 
-# test_data = pd.read_csv("/kaggle/input/shopee-product-matching/sample_submission.csv")
-test_data = pd.read_csv("/home/ace19/dl_data/shopee-product-matching/sample_submission.csv")
-test_images = test_data['image_id'].values
+    gallery_loader = torch.utils.data.DataLoader(galleryset, batch_size=test_batch_size,
+                                                 num_workers=workers)
 
-# test_preds = []
-# tmp = []
-# for i in range(len(FOLD_MODELS)):
-#     #     model = enet_v2(enet_type[i], out_dim=5)
-#     # init the model
-#     model = M.Model(NUM_CLASS, backbone=basemodel)
-#     # print(model)
-#     model = model.cuda()
-#     # load pre-trained model
-#     # https://tutorials.pytorch.kr/beginner/saving_loading_models.html
-#     # 1. 몇몇 키를 제외하고 state_dict 의 일부를 불러오거나, 적재하려는 모델보다 더 많은 키를 갖고 있는 state_dict 를 불러올 때에는
-#     # load_state_dict() 함수에서 strict 인자를 False 로 설정하여 일치하지 않는 키들을 무시하도록 해야 합니다.
-#     # 2. 한 계층에서 다른 계층으로 매개변수를 불러오고 싶지만, 일부 키가 일치하지 않을 때에는 적재하려는 모델의 키와 일치하도록 state_dict 의
-#     # 매개변수 키의 이름을 변경하면 됩니다.
-#     # https: // jangjy.tistory.com / 318
-#     pretrained_dict = torch.load(FOLD_MODELS[i])['state_dict']
-#     new_model_dict = model.state_dict()
-#     pretrained_dict = {k[7:]: v for k, v in pretrained_dict.items()
-#                        if k[7:] in new_model_dict}
-#     new_model_dict.update(pretrained_dict)
-#     model.load_state_dict(new_model_dict)
-#     # inference
-#     # pred, pred2 = inference_func(test_loader)
-#     pred = inference_func(test_loader)
-#     test_preds += [pred]
-#     # tmp += [pred2]
-#
-# test_preds = np.asarray(test_preds).transpose().tolist()
+    gallery_features_list = []
+    gallery_path_list = []
+    gallery_posid_list = []
+    tbar = tqdm(gallery_loader, desc='\r')
+    for batch_idx, (data, pos_id, img_path) in enumerate(tbar):
+        if cuda:
+            data = data.cuda()
 
-test_preds = []
-for i in range(len(FOLD_MODELS)):
-    # init the model
-    model = M.Model(NUM_CLASS, backbone='tf_efficientnet_b4_ns')
-    # print(model)
-    model = model.cuda()
-    # load pre-trained model - https://jangjy.tistory.com/318
-    # model.load_state_dict(torch.load(FOLD_MODELS[i])['state_dict'], strict=True)
-    pretrained_dict = torch.load(FOLD_MODELS[i])['state_dict']
-    new_model_dict = model.state_dict()
-    pretrained_dict = {k[7:]: v for k, v in pretrained_dict.items()
-                       if k[7:] in new_model_dict}
-    new_model_dict.update(pretrained_dict)
-    model.load_state_dict(new_model_dict)
-    # inference
-    test_preds += [inference_func(test_loader, model, 576, 8)]
+        with torch.no_grad():
+            features, output = model(data)
 
-# test_preds = np.asarray(test_preds).transpose().tolist()
-test_preds = np.asarray(test_preds)
-# print(test_preds.shape)
+            gallery_features_list.append(features.cpu().numpy())
+            gallery_path_list.append(img_path)
+            gallery_posid_list.append(pos_id)
 
+    embeds.extend(gallery_features_list)
+    embed_posids.extend(gallery_posid_list)
 
-test_preds2 = []
-for i in range(len(FOLD_MODELS_2)):
-    # init the model
-    model2 = M.Model(NUM_CLASS, backbone='tf_efficientnet_b5_ns')
-    # print(model)
-    model2 = model2.cuda()
-    # load pre-trained model - https://jangjy.tistory.com/318
-    # model.load_state_dict(torch.load(FOLD_MODELS[i])['state_dict'], strict=True)
-    pretrained_dict = torch.load(FOLD_MODELS_2[i])['state_dict']
-    new_model_dict = model2.state_dict()
-    pretrained_dict = {k[7:]: v for k, v in pretrained_dict.items()
-                       if k[7:] in new_model_dict}
-    new_model_dict.update(pretrained_dict)
-    model2.load_state_dict(new_model_dict)
-    # inference
-    test_preds2 += [inference_func(test_loader2, model2, 640, 8)]
+# print("\n ==> Copy query ... ")
+# query_features_list = gallery_features_list.copy()
+# query_path_list = gallery_path_list.copy()
+# query_posid_list = gallery_posid_list.copy()
 
-# test_preds2 = np.asarray(test_preds2).transpose().tolist()
-test_preds2 = np.asarray(test_preds2)
-
-# # https://stackoverflow.com/questions/25815377/sort-list-by-frequency
-# ensemble = []
-# # ensemble2 = []
-# for lst in test_preds:
-#     counts = collections.Counter(lst)
-#     new_list = sorted(lst, key=counts.get, reverse=True)
-#     ensemble.append(new_list[0])
-#     # ensemble2.append(int(np.mean(lst)))
-
-total_pred = test_preds + test_preds2
-total_pred = np.mean(total_pred, axis=0).tolist()
-ensemble = []
-for prob in total_pred:
-    cls = np.argmax(prob)
-    ensemble.append(cls)
+del model
+_ = gc.collect()
+gallery_features = np.concatenate(embeds)
+gallery_posids = np.concatenate(embed_posids)
+print('image embeddings shape', gallery_features.shape)
 
 # TODO
-# pred = 0.5*predictions + 0.5*np.mean(test_preds, axis=0)
-# submission
-test_data['label'] = ensemble
-# test_data['label2'] = ensemble2
-test_data[['image_id', 'label']].to_csv('submit/submission.csv', index=False)
+# import cudf, cuml
+import cupy
+
+image_embeddings = cupy.array(gallery_features)
+
+preds = []
+print('Finding similar images...')
+
+CTS = len(gallery_features) // CHUNK
+if len(gallery_features) % CHUNK != 0:
+    CTS += 1
+
+for j in range(CTS):
+    a = j * CHUNK
+    b = (j + 1) * CHUNK
+    b = min(b, len(gallery_features))
+    print('chunk', a, 'to', b)
+
+    cts = cupy.matmul(image_embeddings, image_embeddings[a:b].T).T
+
+    for k in range(b - a):
+        #         print(sorted(cts[k,], reverse=True))
+        IDX = cupy.where(cts[k,] > 0.5)[0]
+        o = test_df.iloc[cupy.asnumpy(IDX)].posting_id.values
+        preds.append(' '.join(o.tolist()))
+
+submit_df = pd.read_csv("/home/ace19/dl_data/shopee-product-matching/sample_submission.csv")
+
+submit_df['matches'] = preds
+submit_df[['posting_id', 'matches']].to_csv('submission.csv', index=False)

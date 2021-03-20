@@ -17,9 +17,13 @@ Kaggle Competition: Determine if two products are the same by their images
 - how to solve big label classification?
 
 # Trial
-- try image retrieval model.
+- try image retrieval model. -> notebook timeout, Notebook Exceeded Allowed Compute
   - class num: 11014
   - use train data for validate above model because test data was hidden.
+- kaggle notebook 샘플 + 학습된 model (effib4 with class num: 11014)
+  - https://www.kaggle.com/cdeotte/part-2-rapids-tfidfvectorizer-cv-0-700
+  - ViT (??)
+- TODO: kaggle notebook 샘플
 - find other model through some paper
   - use ocr
 
