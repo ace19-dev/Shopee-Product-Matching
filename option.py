@@ -28,7 +28,7 @@ class Options():
                             metavar='N', help='batch size for training (default: 128)')
         parser.add_argument('--test-batch-size', type=int, default=32,
                             metavar='N', help='batch size for testing (default: 256)')
-        parser.add_argument('--epochs', type=int, default=30, metavar='N',
+        parser.add_argument('--epochs', type=int, default=40, metavar='N',
                             help='number of epochs to train (default: 600)')
         parser.add_argument('--start_epoch', type=int, default=1,
                             metavar='N', help='the epoch number to start (default: 1)')
@@ -78,9 +78,9 @@ class Options():
         # parser.add_argument('--output-path', type=str,
         #                     default='/home/ace19/dl_data/deepfake-detection-challenge/face_datasets/grad-cam',
         #                     help='Input image path')
-        parser.add_argument('--beta', default=0.8, type=float,
+        parser.add_argument('--beta', default=0.9, type=float,
                             help='hyperparameter beta')
-        parser.add_argument('--cutmix_prob', default=0.5, type=float,
+        parser.add_argument('--cutmix_prob', default=0.6, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.9, type=float,
                             help='mixup interpolation coefficient (default: 1)')

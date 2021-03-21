@@ -31,6 +31,7 @@ from training.optimizer import Lookahead
 from training.loss import FocalLoss2
 from training.bi_tempered_loss import BiTemperedLogisticLoss
 from training.taylor_cross_entropy_loss import TaylorCrossEntropyLoss
+from training.metrics import *
 from utils.training_helper import *
 from utils.image_helper import *
 
@@ -163,8 +164,9 @@ def main():
                 lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
                 # Crop n Stack random 3 sample model
                 # images2 = crop_images(images, 384, 4)
-                # compute output
-                _, outputs = model(images)
+                # _, outputs = model(images)    # old version
+                feature = model(images)
+                outputs = metric_fc(feature, targets)
 
                 # loss = criterion(activations=outputs,
                 #                  labels=torch.nn.functional.one_hot(target_a),
@@ -181,7 +183,9 @@ def main():
                     # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
                     inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
                     inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    _, outputs = model(inputs)
+                    # _, outputs = model(inputs)    # old version
+                    feature = model(images)
+                    outputs = metric_fc(feature, targets)
                     loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
                     # train_loss += loss.data[0]
                     # _, preds = torch.max(outputs.data, 1)
@@ -193,7 +197,9 @@ def main():
                     # [batch_size, n_crops, c, h, w]
                     # Crop n Stack random 3 sample model
                     # images2 = crop_images(images, 384, 4)
-                    _, outputs = model(images)
+                    # _, outputs = model(images)    # old version
+                    feature = model(images)
+                    outputs = metric_fc(feature, targets)
                     # print('outputs:', outputs.shape)
                     # print('targets:', targets.shape)
 
@@ -260,7 +266,9 @@ def main():
                 # image shape  [n_crops, batch_size, c, h, w]
                 # Crop n Stack random 3 sample model
                 # images2 = crop_images(images, 384, 4)
-                _, outputs = model(images)
+                # _, outputs = model(images)    # old version
+                feature = model(images)
+                outputs = metric_fc(feature, targets)
 
                 # # ------ TTA 1 ---------
                 # batch_size, n_crops, c, h, w = images.size()
@@ -324,6 +332,7 @@ def main():
         save_checkpoint({
             'epoch': epoch,
             'state_dict': model.state_dict(),
+            'metric_state_dict': metric_fc.state_dict(),
             'optimizer': optimizer.state_dict(),
             'best_pred': best_pred,
             'acc_lst_train': acc_lst_train,
@@ -399,6 +408,11 @@ def main():
         logger.info(model)
         # print(model)
 
+        _in = 1792  # tf_efficientnet_b4_ns
+        # _in = 1408  # tf_efficientnet_b2_ns
+        # https://github.com/ronghuaiyang/arcface-pytorch/issues/10
+        metric_fc = ArcMarginProduct(_in, NUM_CLASS, s=30, m=0.5, easy_margin=False)
+
         # freeze_until(model, "pretrained.blocks.5.0.conv_pw.weight")
         # keys = [k for k, v in model.named_parameters() if v.requires_grad]
         # print(keys)
@@ -411,8 +425,8 @@ def main():
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
         criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=NUM_CLASS, smoothing=0.1)
-
+                                           num_cls=NUM_CLASS, smoothing=0.15)
+        # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
         # criterion = FocalLoss2()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
@@ -427,16 +441,20 @@ def main():
         #                             weight_decay=args.weight_decay)
         # https://github.com/clovaai/AdamP
         from adamp import AdamP
-        optimizer = AdamP(model.parameters(), lr=args.lr, betas=(0.9, 0.999),
-                          weight_decay=args.weight_decay)
-
-        # optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
-        #                               weight_decay=args.weight_decay)
-        optimizer = Lookahead(optimizer)
+        optimizer = AdamP([{'params': model.parameters()},
+                           {'params': metric_fc.parameters()}],
+                          lr=args.lr, weight_decay=args.weight_decay)
+        # optimizer = AdamP(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        # optimizer = torch.optim.Adam([{'params': model.parameters()},
+        #                   {'params': metric_fc.parameters()}],
+        #                  lr=args.lr, weight_decay=args.weight_decay)
+        # optimizer = Lookahead(optimizer)
 
         if args.cuda:
             model.cuda()
             model = nn.DataParallel(model)
+            metric_fc.cuda()
+            metric_fc = nn.DataParallel(metric_fc)
             criterion.cuda()
 
         # get the number of model parameters
@@ -452,26 +470,17 @@ def main():
                 best_pred = checkpoint['best_pred']
                 acc_lst_train = checkpoint['acc_lst_train']
                 acc_lst_val = checkpoint['acc_lst_val']
-                # checkpoint['state_dict'].pop('module.pretrained.fc.bias', None)
-                # checkpoint['state_dict'].pop('module.pretrained.fc.weight', None)
-                # checkpoint['state_dict'].pop('module.head.1.weight', None)
-                # checkpoint['state_dict'].pop('module.head.1.bias', None)
-                # checkpoint['state_dict'].pop('module.head2.2.weight', None)
-                # checkpoint['state_dict'].pop('module.head2.2.bias', None)
-                # checkpoint['state_dict']['module.pretrained.fc.bias'] = torch.randn([5], dtype=torch.float64)
-                # checkpoint['state_dict']['module.pretrained.fc.weight'] = torch.randn([5, 2048], dtype=torch.float64)
-                # checkpoint['state_dict']['module.head.1.weight'] = torch.randn([5, 2048], dtype=torch.float64)
-                # checkpoint['state_dict']['module.head.1.bias'] = torch.randn([5], dtype=torch.float64)
-                # checkpoint['state_dict']['module.head2.2.weight'] = torch.randn([5, 4096], dtype=torch.float64)
-                # checkpoint['state_dict']['module.head2.2.bias'] = torch.randn([5], dtype=torch.float64)
+                # lst = ['module.pretrained.fc.weight', 'module.pretrained.fc.bias', 'module.head.1.weight',
+                #        'module.head.1.bias', 'module.head2.2.weight', 'module.head2.2.bias']
+                # pretrained_dict = checkpoint['state_dict']
+                # new_model_dict = model.state_dict()
+                # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in lst}
+                # new_model_dict.update(pretrained_dict)
+                # model.load_state_dict(new_model_dict, strict=False)
 
-                lst = ['module.pretrained.fc.weight', 'module.pretrained.fc.bias', 'module.head.1.weight',
-                       'module.head.1.bias', 'module.head2.2.weight', 'module.head2.2.bias']
-                pretrained_dict = checkpoint['state_dict']
-                new_model_dict = model.state_dict()
-                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in lst}
-                new_model_dict.update(pretrained_dict)
-                model.load_state_dict(new_model_dict, strict=False)
+                model.load_state_dict(checkpoint['state_dict'], strict=False)
+                metric_fc.load_state_dict(checkpoint['metric_state_dict'], strict=False)
+
                 # original code
                 # model.load_state_dict(checkpoint['state_dict'], strict=False)
                 # --------------------------
@@ -497,10 +506,6 @@ def main():
         #                                                                  T_0=10, T_mult=1,
         #                                                                  eta_min=1e-4,
         #                                                                  last_epoch=-1)
-
-        # if args.eval:
-        #     validate(args.start_epoch)
-        #     return
 
         start = timeit.default_timer()
         for epoch in range(args.start_epoch, args.epochs + 1):

@@ -23,7 +23,8 @@ normalize = Normalize(mean=[0.485, 0.456, 0.406],
 # normalize = Normalize(mean=[0.5, 0.5, 0.5],
 #                       std=[0.5, 0.5, 0.5])
 
-CROP_HEIGHT = 380  # 576
+# TODO:
+CROP_HEIGHT = 380  # 380
 CROP_WIDTH = 380
 
 _, rand_augment, _ = transforms_imagenet_train((CROP_HEIGHT, CROP_WIDTH),
@@ -134,7 +135,8 @@ def training_augmentation3():
         A.RandomBrightnessContrast(brightness_limit=0.2, p=0.5),
         A.HueSaturationValue(p=0.5),
         A.ShiftScaleRotate(p=0.5),
-        A.CoarseDropout(max_holes=4, p=0.5),
+        A.CoarseDropout(max_holes=5, p=0.5),
+        # A.CoarseDropout(p=0.5),   # TODO:
         A.Normalize(),
         ToTensorV2(),
     ]

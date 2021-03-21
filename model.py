@@ -8,6 +8,28 @@ import timm
 from pprint import pprint
 
 
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), -1)
+
+
+class Normalize(nn.Module):
+    r"""Performs :math:`L_p` normalization of inputs over specified dimension.
+
+    Args:
+        p (float): the exponent value in the norm formulation. Default: 2
+        dim (int): the dimension to reduce. Default: 1
+    """
+
+    def __init__(self, p=2, dim=1):
+        super(Normalize, self).__init__()
+        self.p = p
+        self.dim = dim
+
+    def forward(self, x):
+        return F.normalize(x, self.p, self.dim, eps=1e-8)
+
+
 def num_flat_features(x):
     size = x.size()[1:]  # all dimensions except the batch dimension
     num_feature = 1
@@ -21,7 +43,6 @@ class Model(nn.Module):
     def __init__(self, backbone, nclass=11014):
         super(Model, self).__init__()
         self.backbone = backbone
-        self.ncode = 32
         self.nclass = nclass
 
         model_names = timm.list_models(pretrained=True)
@@ -70,10 +91,24 @@ class Model(nn.Module):
         elif self.backbone.startswith('tf_efficientnet_b5'):
             in_channels = 2048
 
-        self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
-        self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
+        # self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
+        # self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
         self.fc = nn.Linear(in_channels, in_channels)
-        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        # self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+
+        self.head = nn.Sequential(
+            Flatten(),
+            Normalize(),
+            # nn.Dropout(0.2),
+            nn.Linear(in_channels, in_channels),
+
+            # nn.BatchNorm2d(in_channels),
+            # nn.Dropout(0.1),
+            # Flatten(),
+            # # nn.Linear(in_channels * 12 * 12, in_channels),  # b4
+            # nn.Linear(in_channels * 9 * 9, in_channels),  # b2
+            # Normalize(in_channels)
+        )
 
     def forward(self, x):
         if self.backbone.startswith('tf_efficientnet'):
@@ -100,18 +135,21 @@ class Model(nn.Module):
             x = self.pretrained.layer4(x)
             x = self.pretrained.global_pool(x)
 
-        # COSINE-SOFTMAX
-        # feature_dim = x.size()[1]
-        # x = x.view(-1, num_flat_features(x))
-        # x = F.dropout2d(x, p=0.1)
-        x = self.fc(x)
+        return self.head(x)
 
-        features = x
-        # Features in rows, normalize axis 1.
-        features = F.normalize(features, p=2, dim=1, eps=1e-8)
-
-        # Mean vectors in colums, normalize axis 0.
-        weights_normed = F.normalize(self.weights, p=2, dim=0, eps=1e-8)
-        logits = self.scale.cuda() * torch.mm(features.cuda(), weights_normed.cuda())  # torch.matmul
-
-        return features, logits
+        # ##################
+        # # COSINE-SOFTMAX
+        # ##################
+        # # x = x.view(-1, num_flat_features(x))
+        # # x = F.dropout2d(x, p=0.2)
+        # x = self.fc(x)
+        #
+        # features = x
+        # # Features in rows, normalize axis 1.
+        # features = F.normalize(features, p=2, dim=1, eps=1e-8)
+        #
+        # # Mean vectors in colums, normalize axis 0.
+        # weights_normed = F.normalize(self.weights, p=2, dim=0, eps=1e-8)
+        # logits = self.scale.cuda() * torch.mm(features.cuda(), weights_normed.cuda())  # torch.matmul
+        #
+        # return features, logits

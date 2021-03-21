@@ -117,7 +117,7 @@ class Model(nn.Module):
         # feature_dim = x.size()[1]
         # x = x.view(-1, num_flat_features(x))
         x = F.dropout2d(x, p=0.1)
-        x = self.fc(x)
+        # x = self.fc(x)
 
         features = x
         # Features in rows, normalize axis 1.
@@ -266,18 +266,12 @@ for resume in MODELS:
     features_pool.append(np.concatenate(embeds))
     _ = gc.collect()
 
-# # -------------
-# # max pooling.
-# # -------------
-# gallery_features = features_pool[0]
-# for i in range(1, len(features_pool)):
-#     gallery_features = np.maximum(gallery_features, features_pool[i])
-
 # -------------
-# mean pooling.
+# max pooling.
 # -------------
-features_pool2 = np.asarray(features_pool)
-gallery_features = np.mean(features_pool2, axis=0)
+gallery_features = features_pool[0]
+for i in range(1, len(features_pool)):
+    gallery_features = np.maximum(gallery_features, features_pool[i])
 
 # gallery_posids = np.concatenate(embed_posids)
 print('image embeddings shape', gallery_features.shape)
