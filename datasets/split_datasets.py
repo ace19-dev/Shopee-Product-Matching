@@ -65,6 +65,7 @@ def split_train_val3():
     # sklearn.model_selection.KFold(n_splits=5, shuffle=True, random_seed=42)
     gkf = GroupKFold(n_splits=5)
 
+    # TODO: check again
     x_shuffled, y_shuffled, groups_shuffled = \
         shuffle(train_df, train_df['label'], train_df['image'].tolist(), random_state=8)
     results = []

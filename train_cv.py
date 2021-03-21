@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 import transformer
 import model as M
-from datasets.product import ProductDataset
+from datasets.product import ProductDataset, NUM_CLASS
 from datasets.sampler import ImbalancedDatasetSampler
 from option import Options
 from training.lr_scheduler import LR_Scheduler
@@ -411,7 +411,7 @@ def main():
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
         criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=11014, smoothing=0.1)
+                                           num_cls=NUM_CLASS, smoothing=0.1)
 
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
         # criterion = FocalLoss2()
