@@ -54,23 +54,6 @@ class Model(nn.Module):
         # del pre_model['fc.bias']
         # self.pretrained.load_state_dict(pre_model, strict=False)
 
-        # # copying modules from pretrained models
-        # if self.backbone == 'resnet101':
-        #     self.pretrained = torch_models.resnet101(pretrained=True)
-        # elif self.backbone == 'resnet50':
-        #     self.pretrained = torch_models.resnet50(pretrained=True)
-        # elif self.backbone.startswith('tf_efficientnet'):
-        #     # old efficientnet
-        #     # self.pretrained = EfficientNet.from_pretrained(self.backbone, num_classes=nclass)
-        #
-        #     # use noisy-student pretrained
-        #     model_names = timm.list_models(pretrained=True)
-        #     pprint(model_names)
-        #     self.pretrained = timm.create_model(self.backbone, pretrained=True, num_classes=nclass)
-        #     # print('')
-        # else:
-        #     raise RuntimeError('unknown backbone: {}'.format(self.backbone))
-
         in_channels = 512  # resnet18, resnet34
         if self.backbone in ['resnet18', 'resnet34', 'vgg16', 'vgg19']:
             in_channels = 512
@@ -91,12 +74,21 @@ class Model(nn.Module):
         elif self.backbone.startswith('tf_efficientnet_b5'):
             in_channels = 2048
 
-        # self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
-        # self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
-        # self.fc = nn.Linear(in_channels, in_channels)
-        # self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.fc_scale = 12 * 12  # effinet-b1
+        # self.layer = nn.Conv2d(in_channels, 128, 1),
+        self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
+        self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
+        self.fc = nn.Linear(in_channels, in_channels)
+        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.dropout = nn.Dropout(p=0.2, inplace=True)
+        self.bn2 = nn.BatchNorm2d(in_channels, eps=1e-05)
+        self.features = nn.BatchNorm1d(in_channels, eps=1e-05)
+        self.flatten = Flatten()
+        nn.init.constant_(self.features.weight, 1.0)
+        self.features.weight.requires_grad = False
 
-        # # train_cv_dist
+
+        # # for train_cv_dist
         # self.fc_scale = 8 * 8   # effinet-b1
         # self.bn2 = nn.BatchNorm2d(in_channels * 1, eps=1e-05, )
         # self.dropout = nn.Dropout(p=0.2, inplace=True)
@@ -105,20 +97,13 @@ class Model(nn.Module):
         # nn.init.constant_(self.features.weight, 1.0)
         # self.features.weight.requires_grad = False
 
-        self.head = nn.Sequential(
-            nn.BatchNorm2d(in_channels),
-            Flatten(),
-            # nn.Dropout(0.2),
-            nn.Linear(in_channels * 8 * 8, in_channels),
-            nn.BatchNorm1d(in_channels),
-
-            # nn.BatchNorm2d(in_channels),
-            # nn.Dropout(0.1),
-            # Flatten(),
-            # # nn.Linear(in_channels * 12 * 12, in_channels),  # b4
-            # nn.Linear(in_channels * 9 * 9, in_channels),  # b2
-            # Normalize(in_channels)
-        )
+        # self.head = nn.Sequential(
+        #     nn.BatchNorm2d(in_channels),
+        #     Flatten(),
+        #     # nn.Dropout(0.2),
+        #     nn.Linear(in_channels * 8 * 8, in_channels),
+        #     nn.BatchNorm1d(in_channels),
+        # )
 
     def forward(self, x):
         if self.backbone.startswith('tf_efficientnet'):
@@ -129,7 +114,7 @@ class Model(nn.Module):
             x = self.pretrained.conv_head(x)
             x = self.pretrained.bn2(x)
             x = self.pretrained.act2(x)
-            # x = self.pretrained.global_pool(x)
+            x = self.pretrained.global_pool(x)
             # return self.pretrained.classifier(x)
 
         elif self.backbone.startswith('resnet') or \
@@ -144,9 +129,9 @@ class Model(nn.Module):
             x = self.pretrained.layer2(x)
             x = self.pretrained.layer3(x)
             x = self.pretrained.layer4(x)
-            # x = self.pretrained.global_pool(x)
+            x = self.pretrained.global_pool(x)
 
-        return self.head(x)
+        # return self.head(x)
 
         # # https://github.com/deepinsight/insightface/blob/master/recognition/arcface_torch/backbones/iresnet.py
         # x = self.bn2(x)
@@ -158,19 +143,24 @@ class Model(nn.Module):
         #
         # return x
 
-        # ##################
-        # # COSINE-SOFTMAX
-        # ##################
-        # # x = x.view(-1, num_flat_features(x))
-        # # x = F.dropout2d(x, p=0.2)
-        # x = self.fc(x)
-        #
-        # features = x
-        # # Features in rows, normalize axis 1.
-        # features = F.normalize(features, p=2, dim=1, eps=1e-8)
-        #
-        # # Mean vectors in colums, normalize axis 0.
-        # weights_normed = F.normalize(self.weights, p=2, dim=0, eps=1e-8)
-        # logits = self.scale.cuda() * torch.mm(features.cuda(), weights_normed.cuda())  # torch.matmul
-        #
-        # return features, logits
+        ##################
+        # COSINE-SOFTMAX
+        ##################
+        # x = x.view(-1, num_flat_features(x))
+        # x = F.dropout2d(x, p=0.2)
+
+        # x = self.bn2(x)
+        # x = self.flatten(x)
+        # x = self.dropout(x)
+        x = self.fc(x)
+        x = self.features(x)
+
+        features = x
+        # Features in rows, normalize axis 1.
+        features = F.normalize(features, p=2, dim=1, eps=1e-8)
+
+        # Mean vectors in colums, normalize axis 0.
+        weights_normed = F.normalize(self.weights, p=2, dim=0, eps=1e-8)
+        logits = self.scale.cuda() * torch.mm(features.cuda(), weights_normed.cuda())  # torch.matmul
+
+        return features, logits

@@ -8,7 +8,7 @@ import logging
 import os
 
 import torch
-# import torch.distributed as dist
+import torch.distributed as dist
 from torch.nn import Module
 from torch.nn.functional import normalize, linear
 from torch.nn.parameter import Parameter
@@ -30,7 +30,7 @@ class PartialFC(Module):
         self.num_classes: int = num_classes
         self.rank: int = rank
         self.local_rank: int = local_rank
-        # self.device: torch.device = torch.device("cuda:{}".format(self.local_rank))
+        self.device: torch.device = torch.device("cuda:{}".format(self.local_rank))
         self.world_size: int = world_size
         self.batch_size: int = batch_size
         self.margin_softmax: callable = margin_softmax
@@ -49,8 +49,7 @@ class PartialFC(Module):
                 self.weight: torch.Tensor = torch.load(self.weight_name)
                 logging.info("softmax weight resume successfully!")
             except (FileNotFoundError, KeyError, IndexError):
-                # self.weight = torch.normal(0, 0.01, (self.num_local, self.embedding_size), device=self.device)
-                self.weight = torch.normal(0, 0.01, (self.num_local, self.embedding_size))
+                self.weight = torch.normal(0, 0.01, (self.num_local, self.embedding_size), device=self.device)
                 logging.info("softmax weight resume fail!")
 
             try:
@@ -60,8 +59,7 @@ class PartialFC(Module):
                 self.weight_mom: torch.Tensor = torch.zeros_like(self.weight)
                 logging.info("softmax weight mom resume fail!")
         else:
-            # self.weight = torch.normal(0, 0.01, (self.num_local, self.embedding_size), device=self.device)
-            self.weight = torch.normal(0, 0.01, (self.num_local, self.embedding_size))
+            self.weight = torch.normal(0, 0.01, (self.num_local, self.embedding_size), device=self.device)
             self.weight_mom: torch.Tensor = torch.zeros_like(self.weight)
             logging.info("softmax weight init successfully!")
             logging.info("softmax weight mom init successfully!")
@@ -87,9 +85,7 @@ class PartialFC(Module):
         if int(self.sample_rate) != 1:
             positive = torch.unique(total_label[index_positive], sorted=True)
             if self.num_sample - positive.size(0) >= 0:
-                # perm = torch.rand(size=[self.num_local], device=self.device)
-                perm = torch.rand(size=[self.num_local])
-
+                perm = torch.rand(size=[self.num_local], device=self.device)
                 perm[positive] = 2.0
                 index = torch.topk(perm, k=self.num_sample)[1]
                 index = index.sort()[0]
@@ -113,8 +109,8 @@ class PartialFC(Module):
     def prepare(self, label, optimizer):
         with torch.cuda.stream(self.stream):
             total_label = torch.zeros(
-                size=[self.batch_size * self.world_size], dtype=torch.long)
-            # dist.all_gather(list(total_label.chunk(self.world_size, dim=0)), label)
+                size=[self.batch_size * self.world_size], device=self.device, dtype=torch.long)
+            dist.all_gather(list(total_label.chunk(self.world_size, dim=0)), label)
             self.sample(total_label)
             optimizer.state.pop(optimizer.param_groups[-1]['params'][0], None)
             optimizer.param_groups[-1]['params'][0] = self.sub_weight
@@ -125,8 +121,8 @@ class PartialFC(Module):
     def forward_backward(self, label, features, optimizer):
         total_label, norm_weight = self.prepare(label, optimizer)
         total_features = torch.zeros(
-            size=[self.batch_size * self.world_size, self.embedding_size])
-        # dist.all_gather(list(total_features.chunk(self.world_size, dim=0)), features.data)
+            size=[self.batch_size * self.world_size, self.embedding_size], device=self.device)
+        dist.all_gather(list(total_features.chunk(self.world_size, dim=0)), features.data)
         total_features.requires_grad = True
 
         logits = self.forward(total_features, norm_weight)
@@ -134,12 +130,12 @@ class PartialFC(Module):
 
         with torch.no_grad():
             max_fc = torch.max(logits, dim=1, keepdim=True)[0]
-            # dist.all_reduce(max_fc, dist.ReduceOp.MAX)
+            dist.all_reduce(max_fc, dist.ReduceOp.MAX)
 
             # calculate exp(logits) and all-reduce
             logits_exp = torch.exp(logits - max_fc)
             logits_sum_exp = logits_exp.sum(dim=1, keepdims=True)
-            # dist.all_reduce(logits_sum_exp, dist.ReduceOp.SUM)
+            dist.all_reduce(logits_sum_exp, dist.ReduceOp.SUM)
 
             # calculate prob
             logits_exp.div_(logits_sum_exp)
@@ -153,7 +149,7 @@ class PartialFC(Module):
             # calculate loss
             loss = torch.zeros(grad.size()[0], 1, device=grad.device)
             loss[index] = grad[index].gather(1, total_label[index, None])
-            # dist.all_reduce(loss, dist.ReduceOp.SUM)
+            dist.all_reduce(loss, dist.ReduceOp.SUM)
             loss_v = loss.clamp_min_(1e-30).log_().mean() * (-1)
 
             # calculate grad
@@ -165,7 +161,7 @@ class PartialFC(Module):
             total_features.grad.detach_()
         x_grad: torch.Tensor = torch.zeros_like(features, requires_grad=True)
         # feature gradient all-reduce
-        # dist.reduce_scatter(x_grad, list(total_features.grad.chunk(self.world_size, dim=0)))
+        dist.reduce_scatter(x_grad, list(total_features.grad.chunk(self.world_size, dim=0)))
         x_grad = x_grad * self.world_size
         # backward backbone
         return x_grad, loss_v

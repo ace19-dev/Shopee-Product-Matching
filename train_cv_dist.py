@@ -31,7 +31,7 @@ from training.metrics import *
 from utils.training_helper import *
 from utils.image_helper import *
 from utils.utils_amp import *
-from utils.utils_callbacks import CallBackLogging
+from utils.utils_callbacks import *
 
 # global variable
 best_pred = 0.0
@@ -235,9 +235,9 @@ def main():
                 images, targets = images.cuda(), targets.cuda()
 
             with torch.no_grad():
-                # _, outputs = model(images)    # old version
-                feature = model(images)
-                outputs = metric_fc(feature, targets)
+                _, outputs = model(images)  # old version
+                # feature = model(images)
+                # outputs = metric_fc(feature, targets)
 
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
@@ -290,7 +290,7 @@ def main():
         save_checkpoint({
             'epoch': epoch,
             'state_dict': model.state_dict(),
-            'metric_state_dict': metric_fc.state_dict(),
+            # 'metric_state_dict': metric_fc.state_dict(),
             'optimizer': optimizer.state_dict(),
             'best_pred': best_pred,
             'acc_lst_train': acc_lst_train,
@@ -298,19 +298,6 @@ def main():
         }, logger=logger, args=args, loss=test_loss, is_best=is_best,
             image_size=IMAGE_SIZE, create_at=create_at, filename=args.checkpoint_name,
             foldname=valset.fold_name())
-
-    # world_size = int('4') # os.environ['WORLD_SIZE']
-    # rank = int('0')    # os.environ['RANK']
-    # # dist_url = "tcp://{}:{}".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"])
-    # dist_url = 'tcp://127.0.0.1:1234'
-    # dist.init_process_group(backend='nccl', init_method=dist_url, rank=rank, world_size=world_size)
-    # local_rank = 0
-    # torch.cuda.set_device(local_rank)
-    #
-    # if not os.path.exists(cfg.output) and rank is 0:
-    #     os.makedirs(cfg.output)
-    # else:
-    #     time.sleep(2)
 
     global best_pred, acc_lst_train, acc_lst_val, lr
 
@@ -328,6 +315,20 @@ def main():
         'train_global_steps': 0,
         'valid_global_steps': 0,
     }
+
+    # world_size = int('4') # os.environ['WORLD_SIZE']
+    # rank = int('0')    # os.environ['RANK']
+    world_size = int(os.environ['WORLD_SIZE'])
+    rank = int(os.environ['RANK'])
+    dist_url = "tcp://{}:{}".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"])
+    dist.init_process_group(backend='nccl', init_method=dist_url, rank=rank, world_size=world_size)
+    local_rank = args.local_rank
+    torch.cuda.set_device(local_rank)
+    #
+    # if not os.path.exists(cfg.output) and rank is 0:
+    #     os.makedirs(cfg.output)
+    # else:
+    #     time.sleep(2)
 
     npz_files = os.listdir(os.path.join(args.dataset_root, 'fold'))
     npz_files.sort()
@@ -361,14 +362,15 @@ def main():
                                   fold=[train_filename],
                                   csv=['train.csv'],
                                   mode='train',
-                                  transform=transformer.training_augmentation3(),
-                                  )
+                                  transform=transformer.training_augmentation3(), )
+        train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, shuffle=True)
+
         valset = ProductDataset(data_dir=args.dataset_root,
                                 fold=[val_filename],
                                 csv=['train.csv'],
                                 mode='val',
-                                transform=transformer.validation_augmentation()
-                                )
+                                transform=transformer.validation_augmentation())
+        val_sampler = torch.utils.data.distributed.DistributedSampler(valset, shuffle=False)
 
         logger.info('-------------- train transform --------------')
         logger.info(transformer.training_augmentation3())
@@ -383,23 +385,30 @@ def main():
         # logger.info('-------------- validation transforms --------------')
         # logger.info(pprint.pformat(transforms.validation_augmentation().transforms.transforms) + '\n')
 
-        train_loader = torch.utils.data.DataLoader(trainset,
+        train_loader = torch.utils.data.DataLoader(dataset=trainset,
                                                    batch_size=args.batch_size,
-                                                   num_workers=args.workers,
-                                                   sampler=ImbalancedDatasetSampler(trainset),
+                                                   num_workers=0,
+                                                   sampler=train_sampler,
                                                    pin_memory=True,
                                                    drop_last=True)
-        val_loader = torch.utils.data.DataLoader(valset,
+
+        val_loader = torch.utils.data.DataLoader(dataset=valset,
                                                  batch_size=args.batch_size,
-                                                 shuffle=False,
-                                                 num_workers=args.workers,
-                                                 pin_memory=True)
+                                                 num_workers=0,
+                                                 sampler=val_sampler,
+                                                 pin_memory=True, )
 
         model = M.Model(backbone=args.model)
+        model.to(local_rank)
         # model.half()  # to save space.
         logger.info('\n-------------- model details --------------')
-        logger.info(model)
-        # print(model)
+        # logger.info(model)
+
+        for ps in model.parameters():
+            dist.broadcast(ps, 0)
+        model = torch.nn.parallel.DistributedDataParallel(
+            module=model, broadcast_buffers=False, device_ids=[local_rank])
+        model.train()
 
         _in = 1280  # tf_efficientnet_b1_ns
         # _in = 1408  # tf_efficientnet_b2_ns
@@ -407,9 +416,9 @@ def main():
         # metric_fc = ArcMarginProduct(_in, NUM_CLASS, s=30, m=0.5, easy_margin=False)
         criterion = ArcFace()
         module_partial_fc = PartialFC(
-            rank=0, local_rank=0, world_size=4, resume=args.resume,
+            rank=rank, local_rank=local_rank, world_size=world_size, resume=args.resume,
             batch_size=args.batch_size, margin_softmax=criterion, num_classes=NUM_CLASS,
-            embedding_size=_in, prefix='experiments')
+            sample_rate=1, embedding_size=_in, prefix='experiments')
 
         # freeze_until(model, "pretrained.blocks.5.0.conv_pw.weight")
         # keys = [k for k, v in model.named_parameters() if v.requires_grad]
@@ -432,10 +441,10 @@ def main():
         logger.info(criterion.__str__())
 
         optimizer = torch.optim.SGD([{'params': model.parameters()}],
-                                    lr=args.lr / _in * args.batch_size,
+                                    lr=args.lr / _in * args.batch_size * world_size,
                                     momentum=args.momentum, weight_decay=args.weight_decay)
         optimizer_fc = torch.optim.SGD([{'params': module_partial_fc.parameters()}],
-                                       lr=args.lr / _in * args.batch_size,
+                                       lr=args.lr / _in * args.batch_size * world_size,
                                        momentum=args.momentum, weight_decay=args.weight_decay)
         # https://github.com/clovaai/AdamP
         # from adamp import AdamP
@@ -453,18 +462,14 @@ def main():
         # scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
         #                          len(train_loader) // args.batch_size,
         #                          args.lr_step, warmup_epochs=4)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,
-        #                                                                  T_0=10, T_mult=1,
-        #                                                                  eta_min=1e-4,
-        #                                                                  last_epoch=-1)
 
-        if args.cuda:
-            model.cuda()
-            model = nn.DataParallel(model)
-            module_partial_fc.cuda()
-            # module_partial_fc = nn.DataParallel(module_partial_fc)
-            criterion.cuda()
-            # criterion = nn.DataParallel(criterion)
+        # if args.cuda:
+        #     model.cuda()
+        #     model = nn.DataParallel(model)
+        #     module_partial_fc.cuda()
+        #     # module_partial_fc = nn.DataParallel(module_partial_fc)
+        #     criterion.cuda()
+        #     # criterion = nn.DataParallel(criterion)
 
         # get the number of model parameters
         logger.info('Number of model parameters: {}'.format(
@@ -473,56 +478,100 @@ def main():
         # check point
         if args.resume is not None:
             if os.path.isfile(args.resume):
-                print("=> loading checkpoint '{}'".format(args.resume))
-                checkpoint = torch.load(args.resume)
-                args.start_epoch = checkpoint['epoch'] + 1
-                best_pred = checkpoint['best_pred']
-                acc_lst_train = checkpoint['acc_lst_train']
-                acc_lst_val = checkpoint['acc_lst_val']
-                # lst = ['module.pretrained.fc.weight', 'module.pretrained.fc.bias', 'module.head.1.weight',
-                #        'module.head.1.bias', 'module.head2.2.weight', 'module.head2.2.bias']
-                # pretrained_dict = checkpoint['state_dict']
-                # new_model_dict = model.state_dict()
-                # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in lst}
-                # new_model_dict.update(pretrained_dict)
-                # model.load_state_dict(new_model_dict, strict=False)
+                model.load_state_dict(torch.load(args.resume, map_location=torch.device(local_rank)))
+                if rank is 0:
+                    logging.info("backbone resume successfully!")
 
-                model.load_state_dict(checkpoint['state_dict'], strict=False)
-                # metric_fc.load_state_dict(checkpoint['metric_state_dict'], strict=False)
-
-                # original code
+                # print("=> loading checkpoint '{}'".format(args.resume))
+                # checkpoint = torch.load(args.resume)
+                # args.start_epoch = checkpoint['epoch'] + 1
+                # best_pred = checkpoint['best_pred']
+                # acc_lst_train = checkpoint['acc_lst_train']
+                # acc_lst_val = checkpoint['acc_lst_val']
+                # # lst = ['module.pretrained.fc.weight', 'module.pretrained.fc.bias', 'module.head.1.weight',
+                # #        'module.head.1.bias', 'module.head2.2.weight', 'module.head2.2.bias']
+                # # pretrained_dict = checkpoint['state_dict']
+                # # new_model_dict = model.state_dict()
+                # # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in lst}
+                # # new_model_dict.update(pretrained_dict)
+                # # model.load_state_dict(new_model_dict, strict=False)
+                #
                 # model.load_state_dict(checkpoint['state_dict'], strict=False)
-                # --------------------------
-                # w/ external pre-trained
-                # --------------------------
-                # model.load_state_dict(checkpoint, strict=False)
-
-                # https://github.com/pytorch/pytorch/issues/2830
-                if 'optimizer' in checkpoint:
-                    for state in optimizer.state.values():
-                        for k, v in state.items():
-                            if isinstance(v, torch.Tensor):
-                                state[k] = v.cuda()
-                    # optimizer.load_state_dict(checkpoint['optimizer'])
+                # # metric_fc.load_state_dict(checkpoint['metric_state_dict'], strict=False)
+                #
+                # # original code
+                # # model.load_state_dict(checkpoint['state_dict'], strict=False)
+                # # --------------------------
+                # # w/ external pre-trained
+                # # --------------------------
+                # # model.load_state_dict(checkpoint, strict=False)
+                #
+                # # https://github.com/pytorch/pytorch/issues/2830
+                # if 'optimizer' in checkpoint:
+                #     for state in optimizer.state.values():
+                #         for k, v in state.items():
+                #             if isinstance(v, torch.Tensor):
+                #                 state[k] = v.cuda()
+                #     # optimizer.load_state_dict(checkpoint['optimizer'])
                 print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
             else:
                 raise RuntimeError("=> no resume checkpoint found at '{}'".format(args.resume))
 
         start = timeit.default_timer()
-        for epoch in range(args.start_epoch, args.epochs + 1):
-            logger.info('\n\n[%s] ------- Epoch %d -------' % (time.strftime("%Y/%m/%d %H:%M:%S"), epoch))
+        # for epoch in range(args.start_epoch, args.epochs + 1):
+        #     logger.info('\n\n[%s] ------- Epoch %d -------' % (time.strftime("%Y/%m/%d %H:%M:%S"), epoch))
+        #
+        #     callback_logging = CallBackLogging(1, 0, args.epochs, args.batch_size, None, None)
+        #     loss = AverageMeter()
+        #     # grad_scaler = MaxClipGradScaler(args.batch_size, 128 * args.batch_size, growth_interval=100) if cfg.fp16 else None
+        #     train(epoch)
+        #     validate(epoch)
 
-            callback_logging = CallBackLogging(1, 0, args.epochs, args.batch_size, None, None)
-            loss = AverageMeter()
-            # grad_scaler = MaxClipGradScaler(args.batch_size, 128 * args.batch_size, growth_interval=100) if cfg.fp16 else None
-            train(epoch)
-            validate(epoch)
+        start_epoch = 0
+        total_step = int(len(trainset) / args.batch_size / world_size * args.epochs)
+        if rank is 0: logging.info("Total Step is: %d" % total_step)
+
+        # callback_verification = CallBackVerification(2000, rank, cfg.val_targets, cfg.rec)
+        callback_logging = CallBackLogging(50, rank, total_step, args.batch_size, world_size, None)
+        callback_checkpoint = CallBackModelCheckpoint(rank, args.output)
+
+        loss = AverageMeter()
+        global_step = 0
+        # grad_scaler = MaxClipGradScaler(args.batch_size, 128 * args.batch_size, growth_interval=100) if cfg.fp16 else None
+        for epoch in range(start_epoch, args.epochs):
+            train_sampler.set_epoch(epoch)
+            for step, (images, targets, _) in enumerate(train_loader):
+                global_step += 1
+                features = F.normalize(model(images))
+                x_grad, loss_v = module_partial_fc.forward_backward(targets, features, optimizer_fc)
+                # if cfg.fp16:
+                #     features.backward(grad_scaler.scale(x_grad))
+                #     grad_scaler.unscale_(opt_backbone)
+                #     clip_grad_norm_(backbone.parameters(), max_norm=5, norm_type=2)
+                #     grad_scaler.step(opt_backbone)
+                #     grad_scaler.update()
+                # else:
+                features.backward(x_grad)
+                clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
+                optimizer.step()
+
+                optimizer_fc.step()
+                module_partial_fc.update()
+                optimizer.zero_grad()
+                optimizer_fc.zero_grad()
+                loss.update(loss_v, 1)
+                callback_logging(global_step, loss, epoch, False, None)
+                # callback_verification(global_step, model)
+            callback_checkpoint(global_step, model, module_partial_fc)
+            scheduler.step()
+            scheduler_fc.step()
 
         end = timeit.default_timer()
         logger.info('trained time:%d' % (int((end - start) / 3600)))
         logger.info('%s, training done.\n' % (train_filename.split('_')[1]))
         # logger.info('-------------- Inference Result --------------\n')
 
+    dist.destroy_process_group()
     writer_dict['writer'].close()
 
 

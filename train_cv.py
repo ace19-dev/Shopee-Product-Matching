@@ -146,7 +146,7 @@ def main():
         # last_time = time.time()
         tbar = tqdm(train_loader, desc='\r')
         for batch_idx, (images, targets, fnames) in enumerate(tbar):
-            # scheduler(optimizer, batch_idx, epoch, best_pred)
+            scheduler(optimizer, batch_idx, epoch, best_pred)
 
             if args.cuda:
                 images, targets = images.cuda(), targets.cuda()
@@ -169,9 +169,9 @@ def main():
                 # adjust lambda to exactly match pixel ratio
                 lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
 
-                # _, outputs = model(images)    # old version
-                feature = model(images)
-                outputs = metric_fc(feature, targets)
+                _, outputs = model(images)  # old version
+                # feature = model(images)
+                # outputs = metric_fc(feature, targets)
 
                 # loss = criterion(activations=outputs,
                 #                  labels=torch.nn.functional.one_hot(target_a),
@@ -188,9 +188,9 @@ def main():
                     # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
                     inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
                     inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    # _, outputs = model(inputs)    # old version
-                    feature = model(images)
-                    outputs = metric_fc(feature, targets)
+                    _, outputs = model(inputs)  # old version
+                    # feature = model(images)
+                    # outputs = metric_fc(feature, targets)
                     loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
                     # train_loss += loss.data[0]
                     # _, preds = torch.max(outputs.data, 1)
@@ -199,9 +199,9 @@ def main():
                     #             + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float())
                 else:
                     MIXUP_FLAG = False
-                    # _, outputs = model(images)    # old version
-                    feature = model(images)
-                    outputs = metric_fc(feature, targets)
+                    _, outputs = model(images)  # old version
+                    # feature = model(images)
+                    # outputs = metric_fc(feature, targets)
                     # print('outputs:', outputs.shape)
                     # print('targets:', targets.shape)
 
@@ -225,10 +225,12 @@ def main():
             # statistics
             running_loss += loss.item() * batch_size
             if MIXUP_FLAG:
-                running_corrects += (lam * preds.eq(targets_a.data).cpu().sum().float()
+                running_corrects = running_corrects + \
+                                   (lam * preds.eq(targets_a.data).cpu().sum().float()
                                      + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
             else:
-                running_corrects += torch.sum(preds == targets.data)
+                # https://discuss.pytorch.org/t/trying-to-pass-too-many-cpu-scalars-to-cuda-kernel/87757/4
+                running_corrects = running_corrects + torch.sum(preds == targets.data)
             total_batch_size += batch_size
 
             if batch_idx % 50 == 0:
@@ -236,8 +238,6 @@ def main():
                     epoch, batch_idx * len(images), len(train_loader.dataset),
                            100. * batch_idx / len(train_loader), running_loss / float(total_batch_size),
                            running_corrects / float(total_batch_size)))
-
-        scheduler.step()
 
         epoch_loss = running_loss / float(len(train_loader.dataset))
         epoch_acc = running_corrects / float(len(train_loader.dataset))
@@ -253,7 +253,6 @@ def main():
     def validate(epoch):
         global best_pred, acc_lst_train, acc_lst_val
         is_best = False
-        # confusion_matrix = torch.zeros(NUM_CLASS, NUM_CLASS)
 
         test_loss = 0
         correct = 0
@@ -267,9 +266,9 @@ def main():
                 images, targets = images.cuda(), targets.cuda()
 
             with torch.no_grad():
-                # _, outputs = model(images)    # old version
-                feature = model(images)
-                outputs = metric_fc(feature, targets)
+                _, outputs = model(images)    # old version
+                # feature = model(images)
+                # outputs = metric_fc(feature, targets)
 
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
@@ -288,11 +287,6 @@ def main():
                 pred = outputs.data.max(1, keepdim=True)[1]
                 correct += pred.eq(targets.data.view_as(pred)).long().cpu().sum()
                 total += images.size(0)
-
-                # confusion matrix
-                # _, preds = torch.max(outputs, 1)
-                # for t, p in zip(targets.view(-1), preds.view(-1)):
-                #     confusion_matrix[t.long(), p.long()] += 1
                 tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' %
                                      (test_loss / float(total), correct / float(total)))
 
@@ -300,11 +294,6 @@ def main():
         test_acc = 100. * correct / float(len(val_loader.dataset))
 
         logger.info('[Validate] Loss: %.5f | Acc: %.5f' % (test_loss, test_acc))
-        # logger.info('\n----------------------------------')
-        # logger.info('confusion matrix:\n{}'.format(confusion_matrix.numpy().astype(int)))
-        # # per-class accuracy
-        # logger.info('\nper-class accuracy(precision):\n{}'.format(confusion_matrix.diag() / confusion_matrix.sum(1)))
-        # logger.info('----------------------------------')
 
         writer = writer_dict['writer']
         global_steps = writer_dict['valid_global_steps']
@@ -321,7 +310,7 @@ def main():
         save_checkpoint({
             'epoch': epoch,
             'state_dict': model.state_dict(),
-            'metric_state_dict': metric_fc.state_dict(),
+            # 'metric_state_dict': metric_fc.state_dict(),
             'optimizer': optimizer.state_dict(),
             'best_pred': best_pred,
             'acc_lst_train': acc_lst_train,
@@ -357,14 +346,12 @@ def main():
                                   fold=[train_filename],
                                   csv=['train.csv'],
                                   mode='train',
-                                  transform=transformer.training_augmentation3(),
-                                  )
+                                  transform=transformer.training_augmentation3(),)
         valset = ProductDataset(data_dir=args.dataset_root,
                                 fold=[val_filename],
                                 csv=['train.csv'],
                                 mode='val',
-                                transform=transformer.validation_augmentation()
-                                )
+                                transform=transformer.validation_augmentation())
 
         logger.info('-------------- train transform --------------')
         logger.info(transformer.training_augmentation3())
@@ -397,10 +384,10 @@ def main():
         logger.info(model)
         # print(model)
 
-        _in = 1280  # tf_efficientnet_b1_ns
+        # _in = 1280  # tf_efficientnet_b1_ns
         # _in = 1408  # tf_efficientnet_b2_ns
         # https://github.com/ronghuaiyang/arcface-pytorch/issues/10
-        metric_fc = ArcMarginProduct(_in, NUM_CLASS, s=30, m=0.5, easy_margin=False)
+        # metric_fc = ArcMarginProduct(_in, NUM_CLASS, s=30, m=0.5, easy_margin=False)
 
         # freeze_until(model, "pretrained.blocks.5.0.conv_pw.weight")
         # keys = [k for k, v in model.named_parameters() if v.requires_grad]
@@ -424,9 +411,11 @@ def main():
         # criterion = elr_plus_loss(num_examp=len(train_loader.dataset), num_classes=5, _lambda=1, beta=0.9)
         logger.info(criterion.__str__())
 
-        optimizer = torch.optim.SGD([{'params': model.parameters()},
-                                     {'params': metric_fc.parameters()}],
-                                    lr=args.lr / _in * args.batch_size,
+        optimizer = torch.optim.SGD(model.parameters(),
+                                    # [{'params': model.parameters()},
+                                    #  {'params': metric_fc.parameters()}],
+                                    # lr=args.lr / _in * args.batch_size,
+                                    lr=args.lr,
                                     momentum=args.momentum, weight_decay=args.weight_decay)
         # https://github.com/clovaai/AdamP
         # from adamp import AdamP
@@ -439,14 +428,17 @@ def main():
         #                  lr=args.lr, weight_decay=args.weight_decay)
         # optimizer = Lookahead(optimizer)
 
-        scheduler = \
-            torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
+        scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
+                                 len(train_loader) // args.batch_size,
+                                 args.lr_step, warmup_epochs=4)
+        # scheduler = \
+        #     torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
 
         if args.cuda:
             model.cuda()
             model = nn.DataParallel(model)
-            metric_fc.cuda()
-            metric_fc = nn.DataParallel(metric_fc)
+            # metric_fc.cuda()
+            # metric_fc = nn.DataParallel(metric_fc)
             criterion.cuda()
 
         # get the number of model parameters
@@ -471,7 +463,7 @@ def main():
                 # model.load_state_dict(new_model_dict, strict=False)
 
                 model.load_state_dict(checkpoint['state_dict'], strict=False)
-                metric_fc.load_state_dict(checkpoint['metric_state_dict'], strict=False)
+                # metric_fc.load_state_dict(checkpoint['metric_state_dict'], strict=False)
 
                 # original code
                 # model.load_state_dict(checkpoint['state_dict'], strict=False)
@@ -490,14 +482,6 @@ def main():
                 print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
             else:
                 raise RuntimeError("=> no resume checkpoint found at '{}'".format(args.resume))
-
-        # scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
-        #                          len(train_loader) // args.batch_size,
-        #                          args.lr_step, warmup_epochs=4)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,
-        #                                                                  T_0=10, T_mult=1,
-        #                                                                  eta_min=1e-4,
-        #                                                                  last_epoch=-1)
 
         start = timeit.default_timer()
         for epoch in range(args.start_epoch, args.epochs + 1):

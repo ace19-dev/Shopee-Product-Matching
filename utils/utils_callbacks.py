@@ -5,9 +5,9 @@ from typing import List
 
 import torch
 
-# from eval import verification
-from utils.training_helper import AverageMeter
+# import verification
 from partial_fc import PartialFC
+from utils.training_helper import AverageMeter
 
 
 # class CallBackVerification(object):
@@ -79,10 +79,10 @@ class CallBackLogging(object):
                     self.writer.add_scalar('time_for_end', time_for_end, global_step)
                     self.writer.add_scalar('loss', loss.avg, global_step)
                 if fp16:
-                    msg = "Speed %.2f samples/sec   Loss %.4f   Epoch: %d   Global Step: %d   "\
+                    msg = "Speed %.2f samples/sec   Loss %.4f   Epoch: %d   Global Step: %d   " \
                           "Fp16 Grad Scale: %2.f   Required: %1.f hours" % (
-                        speed_total, loss.avg, epoch, global_step, grad_scaler.get_scale(), time_for_end
-                    )
+                              speed_total, loss.avg, epoch, global_step, grad_scaler.get_scale(), time_for_end
+                          )
                 else:
                     msg = "Speed %.2f samples/sec   Loss %.4f   Epoch: %d   Global Step: %d   Required: %1.f hours" % (
                         speed_total, loss.avg, epoch, global_step, time_for_end

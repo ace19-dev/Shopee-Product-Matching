@@ -5,6 +5,7 @@ class Options():
     def __init__(self):
         # Training settings
         parser = argparse.ArgumentParser(description='shopee-product-matching')
+        parser.add_argument('--local_rank', type=int, default=0, help='local_rank')
         parser.add_argument('--tb-log', type=str,
                             default='tb_log',
                             help='log directory name')
@@ -17,7 +18,7 @@ class Options():
         parser.add_argument('--dataset', type=str, default='cassava',
                             help='training dataset')
         # model params
-        parser.add_argument('--model', type=str, default='tf_efficientnet_b1_ns',
+        parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
                             help='network model type (default: tf_efficientnet_b4_ns)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
@@ -35,7 +36,7 @@ class Options():
         parser.add_argument('--workers', type=int, default=4,
                             metavar='N', help='dataloader threads')
         # lr setting, ViT: 0.0001, tf_efficientnet_b4_ns: 0.001
-        parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
+        parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
@@ -44,7 +45,7 @@ class Options():
         # optimizer
         parser.add_argument('--momentum', type=float, default=0.9,
                             metavar='M', help='SGD momentum (default: 0.9)')
-        parser.add_argument('--weight-decay', type=float, default=0.01,
+        parser.add_argument('--weight-decay', type=float, default=1e-4,
                             metavar='M', help='SGD weight decay (default: 1e-4)')
         # cuda, seed and logging
         parser.add_argument('--no-cuda', action='store_true',
@@ -80,11 +81,11 @@ class Options():
         #                     help='Input image path')
         parser.add_argument('--beta', default=0.9, type=float,
                             help='hyperparameter beta')
-        parser.add_argument('--cutmix_prob', default=0.0, type=float,
+        parser.add_argument('--cutmix_prob', default=0.7, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.9, type=float,
                             help='mixup interpolation coefficient (default: 1)')
-        parser.add_argument('--mixup_prob', default=0.0, type=float,
+        parser.add_argument('--mixup_prob', default=0.5, type=float,
                             help='mixup probability')
         self.parser = parser
 
