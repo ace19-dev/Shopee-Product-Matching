@@ -93,14 +93,24 @@ class Model(nn.Module):
 
         # self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
         # self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
-        self.fc = nn.Linear(in_channels, in_channels)
+        # self.fc = nn.Linear(in_channels, in_channels)
         # self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
 
+        # # train_cv_dist
+        # self.fc_scale = 8 * 8   # effinet-b1
+        # self.bn2 = nn.BatchNorm2d(in_channels * 1, eps=1e-05, )
+        # self.dropout = nn.Dropout(p=0.2, inplace=True)
+        # self.fc = nn.Linear(in_channels * 1 * self.fc_scale, in_channels)
+        # self.features = nn.BatchNorm1d(in_channels, eps=1e-05)
+        # nn.init.constant_(self.features.weight, 1.0)
+        # self.features.weight.requires_grad = False
+
         self.head = nn.Sequential(
+            nn.BatchNorm2d(in_channels),
             Flatten(),
-            Normalize(),
             # nn.Dropout(0.2),
-            nn.Linear(in_channels, in_channels),
+            nn.Linear(in_channels * 8 * 8, in_channels),
+            nn.BatchNorm1d(in_channels),
 
             # nn.BatchNorm2d(in_channels),
             # nn.Dropout(0.1),
@@ -119,8 +129,9 @@ class Model(nn.Module):
             x = self.pretrained.conv_head(x)
             x = self.pretrained.bn2(x)
             x = self.pretrained.act2(x)
-            x = self.pretrained.global_pool(x)
+            # x = self.pretrained.global_pool(x)
             # return self.pretrained.classifier(x)
+
         elif self.backbone.startswith('resnet') or \
                 self.backbone.startswith('resnext') or \
                 self.backbone.startswith('seresnext') or \
@@ -133,9 +144,19 @@ class Model(nn.Module):
             x = self.pretrained.layer2(x)
             x = self.pretrained.layer3(x)
             x = self.pretrained.layer4(x)
-            x = self.pretrained.global_pool(x)
+            # x = self.pretrained.global_pool(x)
 
         return self.head(x)
+
+        # # https://github.com/deepinsight/insightface/blob/master/recognition/arcface_torch/backbones/iresnet.py
+        # x = self.bn2(x)
+        # x = torch.flatten(x, 1)
+        # x = self.dropout(x)
+        # # x = self.fc(x.float() if self.fp16 else x)
+        # x = self.fc(x)
+        # x = self.features(x)
+        #
+        # return x
 
         # ##################
         # # COSINE-SOFTMAX

@@ -16,8 +16,9 @@ import transformer
 import model as M
 from option import Options
 from datasets.product import NUM_CLASS, ProductTestDataset, ProductDataset
-from training.loss import *
+from training._loss import *
 from training.taylor_cross_entropy_loss import TaylorCrossEntropyLoss
+from utils.training_helper import AverageMeter
 
 # global variable
 best_pred = 0.0
@@ -221,25 +222,6 @@ def accuracy(output, target, topk=(1,)):
             correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
-
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
 
 
 if __name__ == "__main__":

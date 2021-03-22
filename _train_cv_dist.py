@@ -1,28 +1,23 @@
 '''
-https://towardsdatascience.com/ensemble-methods-bagging-boosting-and-stacking-c9214a10a205
-https://modulabs-biomedical.github.io/Bias_vs_Variance
-
--> low bias, high variance
-
-1st place solution: https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/221957
-Our final submission first averaged the probabilities of the predicted classes of ViT and ResNext.
-This averaged probability vector was then merged with the predicted probabilities of EfficientnetB4 and CropNet
-in the second stage. For this purpose, the values were simply summed up.
--> 확율 누적.
-
+borrowed from https://github.com/deepinsight/insightface/blob/master/recognition/arcface_torch/train.py
 '''
 
 import pprint
 import random
 import timeit
+from tqdm import tqdm
 
 from tensorboardX import SummaryWriter
+import torch.distributed as dist
+import torch.nn.functional as F
+import torch.utils.data.distributed
+from torch.nn.utils import clip_grad_norm_
 from torch.autograd import Variable
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, CosineAnnealingLR, ReduceLROnPlateau
-from tqdm import tqdm
 
 import transformer
 import model as M
+from partial_fc import PartialFC
 from datasets.product import ProductDataset, NUM_CLASS
 from datasets.sampler import ImbalancedDatasetSampler
 from option import Options
@@ -35,6 +30,8 @@ from training.taylor_cross_entropy_loss import TaylorCrossEntropyLoss
 from training.metrics import *
 from utils.training_helper import *
 from utils.image_helper import *
+from utils.utils_amp import *
+from utils.utils_callbacks import CallBackLogging
 
 # global variable
 best_pred = 0.0
@@ -44,11 +41,6 @@ lr = 0.0
 
 IMAGE_SIZE = str(transformer.CROP_HEIGHT) + 'x' + \
              str(transformer.CROP_WIDTH)
-
-
-def lr_step_func(epoch):
-    return ((epoch + 1) / (4 + 1)) ** 2 if epoch < -1 else 0.1 ** len(
-        [m for m in [8, 14] if m - 1 <= epoch])
 
 
 def mixup_data(x, y, alpha=1.0, use_cuda=True):
@@ -109,29 +101,12 @@ def freeze_bn(net):
             params.requires_grad = True
 
 
+def lr_step_func(epoch):
+    return ((epoch + 1) / (4 + 1)) ** 2 if epoch < -1 else 0.1 ** len(
+        [m for m in [8, 14] if m - 1 <= epoch])
+
+
 def main():
-    global best_pred, acc_lst_train, acc_lst_val, lr
-
-    args, args_desc = Options().parse()
-    args.cuda = not args.no_cuda and torch.cuda.is_available()
-    print(args)
-
-    logger, log_file, final_output_dir, tb_log_dir, create_at = \
-        create_logger(args, args_desc, IMAGE_SIZE)
-    logger.info('-------------- params --------------')
-    logger.info(pprint.pformat(args.__dict__) + '\n')
-
-    writer_dict = {
-        'writer': SummaryWriter(tb_log_dir),
-        'train_global_steps': 0,
-        'valid_global_steps': 0,
-    }
-
-    npz_files = os.listdir(os.path.join(args.dataset_root, 'fold'))
-    npz_files.sort()
-    train_npzs = npz_files[:5]
-    val_npzs = npz_files[5:]
-
     def train(epoch):
         global best_pred, acc_lst_train, acc_lst_val
 
@@ -140,7 +115,7 @@ def main():
         running_loss = 0.0
         running_corrects = 0
         total_batch_size = 0
-        local_step = 0
+        global_step = 0
         MIXUP_FLAG = False
 
         # last_time = time.time()
@@ -151,7 +126,7 @@ def main():
             if args.cuda:
                 images, targets = images.cuda(), targets.cuda()
 
-            local_step += 1
+            global_step += 1
 
             # TODO: move cutmix/fmix/mixup func to ProductDataset .py
             # https://www.kaggle.com/sebastiangnther/cassava-leaf-disease-vit-tpu-training
@@ -168,87 +143,80 @@ def main():
                 images[:, :, bbx1:bbx2, bby1:bby2] = images[rand_index, :, bbx1:bbx2, bby1:bby2]
                 # adjust lambda to exactly match pixel ratio
                 lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
-
                 # _, outputs = model(images)    # old version
-                feature = model(images)
-                outputs = metric_fc(feature, targets)
-
+                features = F.normalize(model(images))
+                x_grad, loss_v = module_partial_fc.forward_backward(targets, features, optimizer_fc)
                 # loss = criterion(activations=outputs,
                 #                  labels=torch.nn.functional.one_hot(target_a),
                 #                  t1=0.5, t2=1.5) * lam + \
                 #        criterion(activations=outputs,
                 #                  labels=torch.nn.functional.one_hot(target_b),
                 #                  t1=0.5, t2=1.5) * (1. - lam)
-                loss = criterion(outputs, target_a) * lam + \
-                       criterion(outputs, target_b) * (1. - lam)
+                # loss = criterion(outputs, target_a) * lam + \
+                #        criterion(outputs, target_b) * (1. - lam)
             else:
-                r = np.random.rand(1)
-                if r < args.mixup_prob:
-                    MIXUP_FLAG = True
-                    # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
-                    inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
-                    inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    # _, outputs = model(inputs)    # old version
-                    feature = model(images)
-                    outputs = metric_fc(feature, targets)
-                    loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
-                    # train_loss += loss.data[0]
-                    # _, preds = torch.max(outputs.data, 1)
-                    # total += targets.size(0)
-                    # correct += (lam * preds.eq(targets_a.data).cpu().sum().float()
-                    #             + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float())
-                else:
-                    MIXUP_FLAG = False
-                    # _, outputs = model(images)    # old version
-                    feature = model(images)
-                    outputs = metric_fc(feature, targets)
-                    # print('outputs:', outputs.shape)
-                    # print('targets:', targets.shape)
+                # _, outputs = model(images)    # old version
+                features = F.normalize(model(images))
+                x_grad, loss_v = module_partial_fc.forward_backward(targets, features, optimizer_fc)
+                # print('outputs:', outputs.shape)
+                # print('targets:', targets.shape)
 
-                    # loss = criterion(activations=outputs,
-                    #                  labels=torch.nn.functional.one_hot(targets),
-                    #                  t1=0.5, t2=1.5)
-                    loss = criterion(outputs, targets)
+                # loss = criterion(activations=outputs,
+                #                  labels=torch.nn.functional.one_hot(targets),
+                #                  t1=0.5, t2=1.5)
+                # loss = criterion(outputs, targets)
 
-            _, preds = torch.max(outputs.data, 1)
+            features.backward(x_grad)
+            clip_grad_norm_(model.parameters(), max_norm=5, norm_type=2)
+            optimizer.step()
+            optimizer_fc.step()
+            module_partial_fc.update()
+            optimizer.zero_grad()
+            optimizer_fc.zero_grad()
+            loss.update(loss_v, 1)
+            callback_logging(global_step, loss, epoch, False, None)
+            # callback_verification(global_step, backbone)
+
+            # _, preds = torch.max(outputs.data, 1)
             # print('preds:', preds)
             # print('targets.data:', targets.data)
 
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            # when scheduler lib.
-            # scheduler.step()
-
-            batch_size = images.size(0)
-            # statistics
-            running_loss += loss.item() * batch_size
-            if MIXUP_FLAG:
-                running_corrects += (lam * preds.eq(targets_a.data).cpu().sum().float()
-                                     + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
-            else:
-                running_corrects += torch.sum(preds == targets.data)
-            total_batch_size += batch_size
-
-            if batch_idx % 50 == 0:
-                tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
-                    epoch, batch_idx * len(images), len(train_loader.dataset),
-                           100. * batch_idx / len(train_loader), running_loss / float(total_batch_size),
-                           running_corrects / float(total_batch_size)))
+            # # compute gradient and do SGD step
+            # optimizer.zero_grad()
+            # loss.backward()
+            # optimizer.step()
+            # # when scheduler lib.
+            # # scheduler.step()
+            #
+            # batch_size = images.size(0)
+            # # statistics
+            # running_loss += loss.item() * batch_size
+            # if MIXUP_FLAG:
+            #     running_corrects += (lam * preds.eq(targets_a.data).cpu().sum().float()
+            #                          + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
+            # else:
+            #     running_corrects += torch.sum(preds == targets.data)
+            # total_batch_size += batch_size
+            #
+            # if batch_idx % 50 == 0:
+            #     tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
+            #         epoch, batch_idx * len(images), len(train_loader.dataset),
+            #                100. * batch_idx / len(train_loader), running_loss / float(total_batch_size),
+            #                running_corrects / float(total_batch_size)))
 
         scheduler.step()
+        scheduler_fc.step()
 
-        epoch_loss = running_loss / float(len(train_loader.dataset))
-        epoch_acc = running_corrects / float(len(train_loader.dataset))
-
-        logger.info('[Train] Loss: {:.4f} Acc: {:.4f}'.format(epoch_loss, epoch_acc))
-
-        writer = writer_dict['writer']
-        global_steps = writer_dict['train_global_steps']
-        writer.add_scalar('train_loss', epoch_loss, global_steps)
-        writer.add_scalar('train_acc', epoch_acc, global_steps)
-        writer_dict['train_global_steps'] = global_steps + 1
+        # epoch_loss = running_loss / float(len(train_loader.dataset))
+        # epoch_acc = running_corrects / float(len(train_loader.dataset))
+        #
+        # logger.info('[Train] Loss: {:.4f} Acc: {:.4f}'.format(epoch_loss, epoch_acc))
+        #
+        # writer = writer_dict['writer']
+        # global_steps = writer_dict['train_global_steps']
+        # writer.add_scalar('train_loss', epoch_loss, global_steps)
+        # writer.add_scalar('train_acc', epoch_acc, global_steps)
+        # writer_dict['train_global_steps'] = global_steps + 1
 
     def validate(epoch):
         global best_pred, acc_lst_train, acc_lst_val
@@ -283,6 +251,7 @@ def main():
                 # outputs = outputs.view(args.batch_size, 8, -1).mean(1)
 
                 test_loss += criterion(outputs, targets).item()
+                # test_loss += criterion(indexs.cpu().detach().numpy().tolist(), outputs, targets).item()
 
                 # get the index of the max log-probability
                 pred = outputs.data.max(1, keepdim=True)[1]
@@ -329,6 +298,41 @@ def main():
         }, logger=logger, args=args, loss=test_loss, is_best=is_best,
             image_size=IMAGE_SIZE, create_at=create_at, filename=args.checkpoint_name,
             foldname=valset.fold_name())
+
+    # world_size = int('4') # os.environ['WORLD_SIZE']
+    # rank = int('0')    # os.environ['RANK']
+    # # dist_url = "tcp://{}:{}".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"])
+    # dist_url = 'tcp://127.0.0.1:1234'
+    # dist.init_process_group(backend='nccl', init_method=dist_url, rank=rank, world_size=world_size)
+    # local_rank = 0
+    # torch.cuda.set_device(local_rank)
+    #
+    # if not os.path.exists(cfg.output) and rank is 0:
+    #     os.makedirs(cfg.output)
+    # else:
+    #     time.sleep(2)
+
+    global best_pred, acc_lst_train, acc_lst_val, lr
+
+    args, args_desc = Options().parse()
+    args.cuda = not args.no_cuda and torch.cuda.is_available()
+    print(args)
+
+    logger, log_file, final_output_dir, tb_log_dir, create_at = \
+        create_logger(args, args_desc, IMAGE_SIZE)
+    logger.info('-------------- params --------------')
+    logger.info(pprint.pformat(args.__dict__) + '\n')
+
+    writer_dict = {
+        'writer': SummaryWriter(tb_log_dir),
+        'train_global_steps': 0,
+        'valid_global_steps': 0,
+    }
+
+    npz_files = os.listdir(os.path.join(args.dataset_root, 'fold'))
+    npz_files.sort()
+    train_npzs = npz_files[:5]
+    val_npzs = npz_files[5:]
 
     for train_filename, val_filename in zip(train_npzs, val_npzs):
         logger.info('****************************')
@@ -399,12 +403,18 @@ def main():
 
         _in = 1280  # tf_efficientnet_b1_ns
         # _in = 1408  # tf_efficientnet_b2_ns
-        # https://github.com/ronghuaiyang/arcface-pytorch/issues/10
-        metric_fc = ArcMarginProduct(_in, NUM_CLASS, s=30, m=0.5, easy_margin=False)
+        # # https://github.com/ronghuaiyang/arcface-pytorch/issues/10
+        # metric_fc = ArcMarginProduct(_in, NUM_CLASS, s=30, m=0.5, easy_margin=False)
+        criterion = ArcFace()
+        module_partial_fc = PartialFC(
+            rank=0, local_rank=0, world_size=4, resume=args.resume,
+            batch_size=args.batch_size, margin_softmax=criterion, num_classes=NUM_CLASS,
+            embedding_size=_in, prefix='experiments')
 
         # freeze_until(model, "pretrained.blocks.5.0.conv_pw.weight")
         # keys = [k for k, v in model.named_parameters() if v.requires_grad]
         # print(keys)
+
         # freeze_bn(model)
 
         # criterion and optimizer
@@ -412,27 +422,23 @@ def main():
         # https://github.com/fhopfmueller/bi-tempered-loss-pytorch
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
-        criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=NUM_CLASS, smoothing=0.15)
+        # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
+        #                                    num_cls=NUM_CLASS, smoothing=0.15)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
         # criterion = FocalLoss2()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
-        # https://github.com/shengliu66/ELR
-        # criterion = elr_loss(num_examp=len(train_loader.dataset), num_classes=NUM_CLASS, _lambda=1, beta=0.9)
-        # criterion = elr_plus_loss(num_examp=len(train_loader.dataset), num_classes=5, _lambda=1, beta=0.9)
         logger.info(criterion.__str__())
 
-        optimizer = torch.optim.SGD([{'params': model.parameters()},
-                                     {'params': metric_fc.parameters()}],
+        optimizer = torch.optim.SGD([{'params': model.parameters()}],
                                     lr=args.lr / _in * args.batch_size,
                                     momentum=args.momentum, weight_decay=args.weight_decay)
+        optimizer_fc = torch.optim.SGD([{'params': module_partial_fc.parameters()}],
+                                       lr=args.lr / _in * args.batch_size,
+                                       momentum=args.momentum, weight_decay=args.weight_decay)
         # https://github.com/clovaai/AdamP
         # from adamp import AdamP
-        # optimizer = AdamP([{'params': model.parameters()},
-        #                    {'params': metric_fc.parameters()}],
-        #                   lr=args.lr, weight_decay=args.weight_decay)
         # optimizer = AdamP(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         # optimizer = torch.optim.Adam([{'params': model.parameters()},
         #                   {'params': metric_fc.parameters()}],
@@ -441,13 +447,24 @@ def main():
 
         scheduler = \
             torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
+        scheduler_fc = \
+            torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer_fc, lr_lambda=lr_step_func)
+
+        # scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
+        #                          len(train_loader) // args.batch_size,
+        #                          args.lr_step, warmup_epochs=4)
+        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,
+        #                                                                  T_0=10, T_mult=1,
+        #                                                                  eta_min=1e-4,
+        #                                                                  last_epoch=-1)
 
         if args.cuda:
             model.cuda()
             model = nn.DataParallel(model)
-            metric_fc.cuda()
-            metric_fc = nn.DataParallel(metric_fc)
+            module_partial_fc.cuda()
+            # module_partial_fc = nn.DataParallel(module_partial_fc)
             criterion.cuda()
+            # criterion = nn.DataParallel(criterion)
 
         # get the number of model parameters
         logger.info('Number of model parameters: {}'.format(
@@ -471,7 +488,7 @@ def main():
                 # model.load_state_dict(new_model_dict, strict=False)
 
                 model.load_state_dict(checkpoint['state_dict'], strict=False)
-                metric_fc.load_state_dict(checkpoint['metric_state_dict'], strict=False)
+                # metric_fc.load_state_dict(checkpoint['metric_state_dict'], strict=False)
 
                 # original code
                 # model.load_state_dict(checkpoint['state_dict'], strict=False)
@@ -491,17 +508,13 @@ def main():
             else:
                 raise RuntimeError("=> no resume checkpoint found at '{}'".format(args.resume))
 
-        # scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
-        #                          len(train_loader) // args.batch_size,
-        #                          args.lr_step, warmup_epochs=4)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,
-        #                                                                  T_0=10, T_mult=1,
-        #                                                                  eta_min=1e-4,
-        #                                                                  last_epoch=-1)
-
         start = timeit.default_timer()
         for epoch in range(args.start_epoch, args.epochs + 1):
             logger.info('\n\n[%s] ------- Epoch %d -------' % (time.strftime("%Y/%m/%d %H:%M:%S"), epoch))
+
+            callback_logging = CallBackLogging(1, 0, args.epochs, args.batch_size, None, None)
+            loss = AverageMeter()
+            # grad_scaler = MaxClipGradScaler(args.batch_size, 128 * args.batch_size, growth_interval=100) if cfg.fp16 else None
             train(epoch)
             validate(epoch)
 

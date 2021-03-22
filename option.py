@@ -17,7 +17,7 @@ class Options():
         parser.add_argument('--dataset', type=str, default='cassava',
                             help='training dataset')
         # model params
-        parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
+        parser.add_argument('--model', type=str, default='tf_efficientnet_b1_ns',
                             help='network model type (default: tf_efficientnet_b4_ns)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
@@ -80,7 +80,7 @@ class Options():
         #                     help='Input image path')
         parser.add_argument('--beta', default=0.9, type=float,
                             help='hyperparameter beta')
-        parser.add_argument('--cutmix_prob', default=0.6, type=float,
+        parser.add_argument('--cutmix_prob', default=0.0, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.9, type=float,
                             help='mixup interpolation coefficient (default: 1)')
