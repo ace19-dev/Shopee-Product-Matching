@@ -23,7 +23,9 @@ Kaggle Competition: Determine if two products are the same by their images
 - kaggle notebook 샘플 + 학습된 model (effib4 with class num: 11014)
   - https://www.kaggle.com/cdeotte/part-2-rapids-tfidfvectorizer-cv-0-700
   - ViT (??)
-- TODO: kaggle notebook 샘플
+- 기존 대회 데이터로 pretrained model 획득.
+  - https://www.kaggle.com/c/shopee-product-matching/discussion/227671
+- ArcFace 적용.
 - find other model through some paper
   - use ocr
 

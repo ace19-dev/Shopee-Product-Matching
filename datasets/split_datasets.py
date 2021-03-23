@@ -42,9 +42,14 @@ def split_train_val3():
     train_df = pd.read_csv(os.path.join(args.source, 'train.csv'))
     print('total: ', len(train_df))
     print('train shape: ', train_df.shape, '\n')
+    # # delete old unusual
+    # train_df = train_df.loc[~train_df.filename.isin(
+    #     ["64faf0b221af4767ba8c167b228fde00.jpg", "d946ee19ac1d2997bac5f18ce75656cb.jpg"])].reset_index(drop=True)
+
     # delete outliers
     # train_df = train_df[~train_df['image_id'].isin(OUTLIERS)]
     # print('total:\n', len(train_df), '\n')
+
     # delete unusual
     # train_df = train_df[~train_df['image_id'].isin(UNUSUAL)]
     # print('total:\n', len(train_df), '\n')
@@ -153,10 +158,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--source',
                         type=str,
-                        default='/home/ace19/dl_data/shopee-product-matching',
+                        default='/home/ace19/dl_data/shopee-product-matching-old',
                         help='Where is train image to load')
     parser.add_argument('--target', type=str,
-                        default='/home/ace19/dl_data/shopee-product-matching/fold',
+                        default='/home/ace19/dl_data/shopee-product-matching-old/fold',
                         help='directory to save splited dataset')
 
     args = parser.parse_args()

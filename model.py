@@ -74,18 +74,17 @@ class Model(nn.Module):
         elif self.backbone.startswith('tf_efficientnet_b5'):
             in_channels = 2048
 
-        self.fc_scale = 12 * 12  # effinet-b1
-        # self.layer = nn.Conv2d(in_channels, 128, 1),
-        self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
-        self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
-        self.fc = nn.Linear(in_channels, in_channels)
-        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
-        self.dropout = nn.Dropout(p=0.2, inplace=True)
-        self.bn2 = nn.BatchNorm2d(in_channels, eps=1e-05)
-        self.features = nn.BatchNorm1d(in_channels, eps=1e-05)
-        self.flatten = Flatten()
-        nn.init.constant_(self.features.weight, 1.0)
-        self.features.weight.requires_grad = False
+        # self.fc_scale = 12 * 12  # effinet-b1
+        # self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
+        # self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
+        # self.fc = nn.Linear(in_channels, in_channels)
+        # self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        # self.dropout = nn.Dropout(p=0.2, inplace=True)
+        # self.bn2 = nn.BatchNorm2d(in_channels, eps=1e-05)
+        # self.features = nn.BatchNorm1d(in_channels, eps=1e-05)
+        # self.flatten = Flatten()
+        # nn.init.constant_(self.features.weight, 1.0)
+        # self.features.weight.requires_grad = False
 
 
         # # for train_cv_dist
@@ -115,7 +114,7 @@ class Model(nn.Module):
             x = self.pretrained.bn2(x)
             x = self.pretrained.act2(x)
             x = self.pretrained.global_pool(x)
-            # return self.pretrained.classifier(x)
+            return self.pretrained.classifier(x)
 
         elif self.backbone.startswith('resnet') or \
                 self.backbone.startswith('resnext') or \

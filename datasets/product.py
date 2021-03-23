@@ -8,7 +8,8 @@ import numpy as np
 import torch
 import torch.utils.data as data
 
-NUM_CLASS = 11014
+# NUM_CLASS = 11014
+NUM_CLASS = 42
 
 
 class ProductDataset(data.Dataset):
@@ -21,16 +22,20 @@ class ProductDataset(data.Dataset):
 
         samples = list(np.concatenate([np.load(data_dir + '/fold/%s' % f, allow_pickle=True) for f in self.fold]))
         self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
-        self.df = df_loc_by_list(self.df, 'posting_id', samples)
-        self.images = self.df['image'].values.tolist()
-        self.labels = self.df['label'].values.tolist()  # create 'label' by grouping 'label_group'
+        # TODO: back to the this competition
+        # self.df = df_loc_by_list(self.df, 'posting_id', samples)
+        # self.images = self.df['image'].values.tolist()
+        # self.labels = self.df['label'].values.tolist()  # create 'label' by grouping 'label_group'
+        self.df = df_loc_by_list(self.df, 'filename', samples)
+        self.images = self.df['filename'].values.tolist()
+        self.labels = self.df['category'].values.tolist()
         self.labels = [int(i) for i in self.labels]
         assert (len(self.images) == len(self.labels))
 
     def __getitem__(self, index):
         image_id = self.images[index]
         # image_path = os.path.join(self.data_dir, 'train_images', image_id)
-        image_path = os.path.join(self.data_dir, 'train_images', image_id)
+        image_path = os.path.join(self.data_dir, 'train', image_id)
         # print('##### ', image_path)
         image = cv2.imread(image_path, cv2.IMREAD_COLOR)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

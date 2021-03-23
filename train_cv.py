@@ -129,19 +129,20 @@ def main():
 
     npz_files = os.listdir(os.path.join(args.dataset_root, 'fold'))
     npz_files.sort()
-    train_npzs = npz_files[:5]
-    val_npzs = npz_files[5:]
+    num = int(len(npz_files) / 2)
+    train_npzs = npz_files[:num]
+    val_npzs = npz_files[num:]
 
     def train(epoch):
         global best_pred, acc_lst_train, acc_lst_val
 
-        model.train()
-
-        running_loss = 0.0
-        running_corrects = 0
-        total_batch_size = 0
         local_step = 0
         MIXUP_FLAG = False
+
+        losses = AverageMeter()
+        accs = AverageMeter()
+
+        model.train()
 
         # last_time = time.time()
         tbar = tqdm(train_loader, desc='\r')
@@ -169,7 +170,8 @@ def main():
                 # adjust lambda to exactly match pixel ratio
                 lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
 
-                _, outputs = model(images)  # old version
+                outputs = model(images)
+                # _, outputs = model(images)  # old version
                 # feature = model(images)
                 # outputs = metric_fc(feature, targets)
 
@@ -188,7 +190,8 @@ def main():
                     # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
                     inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
                     inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    _, outputs = model(inputs)  # old version
+                    outputs = model(images)
+                    # _, outputs = model(images)  # old version
                     # feature = model(images)
                     # outputs = metric_fc(feature, targets)
                     loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
@@ -199,7 +202,8 @@ def main():
                     #             + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float())
                 else:
                     MIXUP_FLAG = False
-                    _, outputs = model(images)  # old version
+                    outputs = model(images)
+                    # _, outputs = model(images)  # old version
                     # feature = model(images)
                     # outputs = metric_fc(feature, targets)
                     # print('outputs:', outputs.shape)
@@ -221,42 +225,36 @@ def main():
             # when scheduler lib.
             # scheduler.step()
 
-            batch_size = images.size(0)
-            # statistics
-            running_loss += loss.item() * batch_size
+            batch_size = float(images.size(0))
+            losses.update(loss.data, batch_size)
             if MIXUP_FLAG:
-                running_corrects = running_corrects + \
-                                   (lam * preds.eq(targets_a.data).cpu().sum().float()
-                                     + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
+                running_corrects = (lam * preds.eq(targets_a.data).cpu().sum().float() +
+                                    (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
+                accs.update(running_corrects, batch_size)
+
             else:
                 # https://discuss.pytorch.org/t/trying-to-pass-too-many-cpu-scalars-to-cuda-kernel/87757/4
-                running_corrects = running_corrects + torch.sum(preds == targets.data)
-            total_batch_size += batch_size
+                accs.update(torch.sum(preds == targets.data), batch_size)
 
             if batch_idx % 50 == 0:
                 tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
                     epoch, batch_idx * len(images), len(train_loader.dataset),
-                           100. * batch_idx / len(train_loader), running_loss / float(total_batch_size),
-                           running_corrects / float(total_batch_size)))
+                           100. * batch_idx / len(train_loader), losses.avg, accs.avg))
 
-        epoch_loss = running_loss / float(len(train_loader.dataset))
-        epoch_acc = running_corrects / float(len(train_loader.dataset))
-
-        logger.info('[Train] Loss: {:.4f} Acc: {:.4f}'.format(epoch_loss, epoch_acc))
+        logger.info('[Train] Loss: {:.4f} Acc: {:.4f}'.format(losses.avg, accs.avg))
 
         writer = writer_dict['writer']
         global_steps = writer_dict['train_global_steps']
-        writer.add_scalar('train_loss', epoch_loss, global_steps)
-        writer.add_scalar('train_acc', epoch_acc, global_steps)
+        writer.add_scalar('train_loss', losses.avg, global_steps)
+        writer.add_scalar('train_acc', accs.avg, global_steps)
         writer_dict['train_global_steps'] = global_steps + 1
 
     def validate(epoch):
         global best_pred, acc_lst_train, acc_lst_val
         is_best = False
 
-        test_loss = 0
-        correct = 0
-        total = 0
+        losses = AverageMeter()
+        accs = AverageMeter()
 
         model.eval()
 
@@ -266,7 +264,8 @@ def main():
                 images, targets = images.cuda(), targets.cuda()
 
             with torch.no_grad():
-                _, outputs = model(images)    # old version
+                outputs = model(images)
+                # _, outputs = model(images)  # old version
                 # feature = model(images)
                 # outputs = metric_fc(feature, targets)
 
@@ -281,31 +280,31 @@ def main():
                 # outputs = model(images)
                 # outputs = outputs.view(args.batch_size, 8, -1).mean(1)
 
-                test_loss += criterion(outputs, targets).item()
-
+                loss = criterion(outputs, targets)
                 # get the index of the max log-probability
                 pred = outputs.data.max(1, keepdim=True)[1]
-                correct += pred.eq(targets.data.view_as(pred)).long().cpu().sum()
-                total += images.size(0)
-                tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' %
-                                     (test_loss / float(total), correct / float(total)))
+                correct = pred.eq(targets.data.view_as(pred)).long().cpu().sum()
 
-        test_loss /= float(len(val_loader.dataset))
-        test_acc = 100. * correct / float(len(val_loader.dataset))
+                batch_size = float(images.size(0))
+                losses.update(loss.data, batch_size)
+                accs.update(correct, batch_size)
 
-        logger.info('[Validate] Loss: %.5f | Acc: %.5f' % (test_loss, test_acc))
+                # total += images.size(0)
+                tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' % (losses.avg, accs.avg))
+
+        logger.info('[Validate] Loss: %.5f | Acc: %.5f' % (losses.avg, accs.avg))
 
         writer = writer_dict['writer']
         global_steps = writer_dict['valid_global_steps']
-        writer.add_scalar('valid_loss', test_loss, global_steps)
-        writer.add_scalar('valid_acc', test_acc, global_steps)
+        writer.add_scalar('valid_loss', losses.avg, global_steps)
+        writer.add_scalar('valid_acc', accs.avg, global_steps)
         writer_dict['valid_global_steps'] = global_steps + 1
 
         # save checkpoint
-        acc_lst_val += [test_acc]
-        if test_acc > best_pred:
-            logger.info('** [best_pred]: {:.4f}'.format(test_acc))
-            best_pred = test_acc
+        acc_lst_val += [accs.avg]
+        if accs.avg > best_pred:
+            logger.info('** [best_pred]: {:.4f}'.format(accs.avg))
+            best_pred = accs.avg
             is_best = True
         save_checkpoint({
             'epoch': epoch,
@@ -315,7 +314,7 @@ def main():
             'best_pred': best_pred,
             'acc_lst_train': acc_lst_train,
             'acc_lst_val': acc_lst_val,
-        }, logger=logger, args=args, loss=test_loss, is_best=is_best,
+        }, logger=logger, args=args, loss=losses.avg, is_best=is_best,
             image_size=IMAGE_SIZE, create_at=create_at, filename=args.checkpoint_name,
             foldname=valset.fold_name())
 
@@ -346,7 +345,7 @@ def main():
                                   fold=[train_filename],
                                   csv=['train.csv'],
                                   mode='train',
-                                  transform=transformer.training_augmentation3(),)
+                                  transform=transformer.training_augmentation3(), )
         valset = ProductDataset(data_dir=args.dataset_root,
                                 fold=[val_filename],
                                 csv=['train.csv'],
@@ -399,11 +398,11 @@ def main():
         # https://github.com/fhopfmueller/bi-tempered-loss-pytorch
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
-        criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=NUM_CLASS, smoothing=0.15)
+        # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
+        #                                    num_cls=NUM_CLASS, smoothing=0.1)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        # criterion = FocalLoss2()
+        criterion = FocalLoss2()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         # https://github.com/shengliu66/ELR
@@ -411,18 +410,18 @@ def main():
         # criterion = elr_plus_loss(num_examp=len(train_loader.dataset), num_classes=5, _lambda=1, beta=0.9)
         logger.info(criterion.__str__())
 
-        optimizer = torch.optim.SGD(model.parameters(),
-                                    # [{'params': model.parameters()},
-                                    #  {'params': metric_fc.parameters()}],
-                                    # lr=args.lr / _in * args.batch_size,
-                                    lr=args.lr,
-                                    momentum=args.momentum, weight_decay=args.weight_decay)
+        # optimizer = torch.optim.SGD(model.parameters(),
+        #                             # [{'params': model.parameters()},
+        #                             #  {'params': metric_fc.parameters()}],
+        #                             # lr=args.lr / _in * args.batch_size,
+        #                             lr=args.lr,
+        #                             momentum=args.momentum, weight_decay=args.weight_decay)
         # https://github.com/clovaai/AdamP
-        # from adamp import AdamP
+        from adamp import AdamP
         # optimizer = AdamP([{'params': model.parameters()},
         #                    {'params': metric_fc.parameters()}],
         #                   lr=args.lr, weight_decay=args.weight_decay)
-        # optimizer = AdamP(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = AdamP(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         # optimizer = torch.optim.Adam([{'params': model.parameters()},
         #                   {'params': metric_fc.parameters()}],
         #                  lr=args.lr, weight_decay=args.weight_decay)
@@ -430,7 +429,7 @@ def main():
 
         scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
                                  len(train_loader) // args.batch_size,
-                                 args.lr_step, warmup_epochs=4)
+                                 args.lr_step, warmup_epochs=5)
         # scheduler = \
         #     torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
 

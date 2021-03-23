@@ -10,7 +10,7 @@ class Options():
                             default='tb_log',
                             help='log directory name')
         parser.add_argument('--dataset-root', type=str,
-                            default='/home/ace19/dl_data/shopee-product-matching',
+                            default='/home/ace19/dl_data/shopee-product-matching-old',
                             help='root')
         parser.add_argument('--output', type=str,
                             default='experiments',
@@ -29,14 +29,14 @@ class Options():
                             metavar='N', help='batch size for training (default: 128)')
         parser.add_argument('--test-batch-size', type=int, default=32,
                             metavar='N', help='batch size for testing (default: 256)')
-        parser.add_argument('--epochs', type=int, default=40, metavar='N',
+        parser.add_argument('--epochs', type=int, default=15, metavar='N',
                             help='number of epochs to train (default: 600)')
         parser.add_argument('--start_epoch', type=int, default=1,
                             metavar='N', help='the epoch number to start (default: 1)')
         parser.add_argument('--workers', type=int, default=4,
                             metavar='N', help='dataloader threads')
         # lr setting, ViT: 0.0001, tf_efficientnet_b4_ns: 0.001
-        parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
+        parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
