@@ -226,15 +226,17 @@ def main():
             # scheduler.step()
 
             batch_size = float(images.size(0))
-            losses.update(loss.data, batch_size)
+            # https://stackoverflow.com/questions/9452775/converting-numpy-dtypes-to-native-python-types
+            losses.update(loss.data.cpu().numpy().item(), batch_size)
             if MIXUP_FLAG:
-                running_corrects = (lam * preds.eq(targets_a.data).cpu().sum().float() +
+                correct = (lam * preds.eq(targets_a.data).cpu().sum().float() +
                                     (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
-                accs.update(running_corrects, batch_size)
+                accs.update(correct.cpu().numpy().item(), batch_size)
 
             else:
                 # https://discuss.pytorch.org/t/trying-to-pass-too-many-cpu-scalars-to-cuda-kernel/87757/4
-                accs.update(torch.sum(preds == targets.data), batch_size)
+                correct = torch.sum(preds == targets.data)
+                accs.update(correct.cpu().numpy().item(), batch_size)
 
             if batch_idx % 50 == 0:
                 tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
@@ -286,8 +288,8 @@ def main():
                 correct = pred.eq(targets.data.view_as(pred)).long().cpu().sum()
 
                 batch_size = float(images.size(0))
-                losses.update(loss.data, batch_size)
-                accs.update(correct, batch_size)
+                losses.update(loss.data.cpu().numpy().item(), batch_size)
+                accs.update(correct.cpu().numpy().item(), batch_size)
 
                 # total += images.size(0)
                 tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' % (losses.avg, accs.avg))
