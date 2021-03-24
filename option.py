@@ -10,7 +10,7 @@ class Options():
                             default='tb_log',
                             help='log directory name')
         parser.add_argument('--dataset-root', type=str,
-                            default='/home/ace19/dl_data/shopee-product-matching-old',
+                            default='/home/ace19/dl_data/shopee-product-matching',
                             help='root')
         parser.add_argument('--output', type=str,
                             default='experiments',
@@ -29,14 +29,14 @@ class Options():
                             metavar='N', help='batch size for training (default: 128)')
         parser.add_argument('--test-batch-size', type=int, default=32,
                             metavar='N', help='batch size for testing (default: 256)')
-        parser.add_argument('--epochs', type=int, default=15, metavar='N',
+        parser.add_argument('--epochs', type=int, default=40, metavar='N',
                             help='number of epochs to train (default: 600)')
         parser.add_argument('--start_epoch', type=int, default=1,
                             metavar='N', help='the epoch number to start (default: 1)')
         parser.add_argument('--workers', type=int, default=4,
                             metavar='N', help='dataloader threads')
         # lr setting, ViT: 0.0001, tf_efficientnet_b4_ns: 0.001
-        parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
+        parser.add_argument('--lr', type=float, default=0.0003, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
@@ -45,7 +45,7 @@ class Options():
         # optimizer
         parser.add_argument('--momentum', type=float, default=0.9,
                             metavar='M', help='SGD momentum (default: 0.9)')
-        parser.add_argument('--weight-decay', type=float, default=1e-4,
+        parser.add_argument('--weight-decay', type=float, default=0.01,
                             metavar='M', help='SGD weight decay (default: 1e-4)')
         # cuda, seed and logging
         parser.add_argument('--no-cuda', action='store_true',
@@ -81,7 +81,7 @@ class Options():
         #                     help='Input image path')
         parser.add_argument('--beta', default=0.9, type=float,
                             help='hyperparameter beta')
-        parser.add_argument('--cutmix_prob', default=0.7, type=float,
+        parser.add_argument('--cutmix_prob', default=0.6, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.9, type=float,
                             help='mixup interpolation coefficient (default: 1)')

@@ -170,8 +170,7 @@ def main():
                 # adjust lambda to exactly match pixel ratio
                 lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
 
-                outputs = model(images)
-                # _, outputs = model(images)  # old version
+                _, outputs = model(images)  # old version
                 # feature = model(images)
                 # outputs = metric_fc(feature, targets)
 
@@ -190,8 +189,7 @@ def main():
                     # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
                     inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
                     inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    outputs = model(images)
-                    # _, outputs = model(images)  # old version
+                    _, outputs = model(images)  # old version
                     # feature = model(images)
                     # outputs = metric_fc(feature, targets)
                     loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
@@ -202,8 +200,7 @@ def main():
                     #             + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float())
                 else:
                     MIXUP_FLAG = False
-                    outputs = model(images)
-                    # _, outputs = model(images)  # old version
+                    _, outputs = model(images)  # old version
                     # feature = model(images)
                     # outputs = metric_fc(feature, targets)
                     # print('outputs:', outputs.shape)
@@ -230,7 +227,7 @@ def main():
             losses.update(loss.data.cpu().numpy().item(), batch_size)
             if MIXUP_FLAG:
                 correct = (lam * preds.eq(targets_a.data).cpu().sum().float() +
-                                    (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
+                           (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
                 accs.update(correct.cpu().numpy().item(), batch_size)
 
             else:
@@ -266,8 +263,7 @@ def main():
                 images, targets = images.cuda(), targets.cuda()
 
             with torch.no_grad():
-                outputs = model(images)
-                # _, outputs = model(images)  # old version
+                _, outputs = model(images)  # old version
                 # feature = model(images)
                 # outputs = metric_fc(feature, targets)
 
@@ -322,7 +318,9 @@ def main():
 
     for train_filename, val_filename in zip(train_npzs, val_npzs):
         logger.info('****************************')
-        logger.info('%s, training start.' % (train_filename.split('_')[1]))
+        logger.info('fold: %s' % (train_filename.split('_')[1]))
+        logger.info('train filename: %s' % (train_filename))
+        logger.info('val filename: %s' % (val_filename))
         logger.info('****************************\n')
 
         best_pred = 0.0
@@ -379,7 +377,7 @@ def main():
                                                  num_workers=args.workers,
                                                  pin_memory=True)
 
-        model = M.Model(backbone=args.model)
+        model = M.Model(backbone=args.model, nclass=NUM_CLASS)
         # model.half()  # to save space.
         logger.info('\n-------------- model details --------------')
         logger.info(model)
@@ -400,11 +398,11 @@ def main():
         # https://github.com/fhopfmueller/bi-tempered-loss-pytorch
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
-        # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-        #                                    num_cls=NUM_CLASS, smoothing=0.1)
+        criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
+                                           num_cls=NUM_CLASS, smoothing=0.1)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        criterion = FocalLoss2()
+        # criterion = FocalLoss2()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         # https://github.com/shengliu66/ELR
@@ -429,9 +427,10 @@ def main():
         #                  lr=args.lr, weight_decay=args.weight_decay)
         # optimizer = Lookahead(optimizer)
 
+        # TODO: change scheduler: CosineAnnealingWarmRestarts
         scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
                                  len(train_loader) // args.batch_size,
-                                 args.lr_step, warmup_epochs=5)
+                                 args.lr_step, warmup_epochs=3)
         # scheduler = \
         #     torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
 
@@ -444,7 +443,7 @@ def main():
 
         # get the number of model parameters
         logger.info('Number of model parameters: {}'.format(
-            sum([p.data.nelement() for p in model.parameters()])))
+            sum([p.data.nelement() for p in model.parameters()])) + '\n')
 
         # check point
         if args.resume is not None:

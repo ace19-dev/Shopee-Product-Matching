@@ -15,6 +15,8 @@ Kaggle Competition: Determine if two products are the same by their images
 # Things to think about.
 - big loss -> 클래스가 많아서? 상대적으로 낮은 validation loss -> 왜?
 - how to solve big label classification?
+- CV 리뷰, make fold 재 확인 필요.
+- LR Scheduler 변경.
 
 # Trial
 - try image retrieval model. -> notebook timeout, Notebook Exceeded Allowed Compute

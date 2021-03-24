@@ -49,7 +49,6 @@ def split_train_val3():
     # delete outliers
     # train_df = train_df[~train_df['image_id'].isin(OUTLIERS)]
     # print('total:\n', len(train_df), '\n')
-
     # delete unusual
     # train_df = train_df[~train_df['image_id'].isin(UNUSUAL)]
     # print('total:\n', len(train_df), '\n')
@@ -66,11 +65,15 @@ def split_train_val3():
     # train_df['label2'] = np.where(train_df['label'].isin([0, 1, 2, 3]), 1, 0)
     # train_df.to_csv(os.path.join(args.source, 'train2.csv'), sep=',', na_rep='NaN')
 
+    # # https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
+    # gkf = GroupKFold(n_splits=5)
+    # df_train['fold'] = -1
+    # for fold, (train_idx, valid_idx) in enumerate(gkf.split(df_train, None, df_train.label_group)):
+    #     df_train.loc[valid_idx, 'fold'] = fold
+
     # https://www.kaggle.com/c/siim-isic-melanoma-classification/discussion/175614
     # sklearn.model_selection.KFold(n_splits=5, shuffle=True, random_seed=42)
     gkf = GroupKFold(n_splits=5)
-
-    # TODO: check again
     x_shuffled, y_shuffled, groups_shuffled = \
         shuffle(train_df, train_df['label'], train_df['image'].tolist(), random_state=8)
     results = []
@@ -144,7 +147,7 @@ def main(args):
     # test_groupkfold()
 
     # reference on https://www.kaggle.com/reighns/groupkfold-efficientbnet
-    create_label_column()
+    # create_label_column()
     split_train_val3()
 
     # temp
