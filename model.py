@@ -205,9 +205,6 @@ class Model(nn.Module):
         ##################
         # x = x.view(-1, num_flat_features(x))
         # x = F.dropout2d(x, p=0.2)
-
-        # x = self.bn2(x)
-        # x = self.flatten(x)
         # x = self.dropout(x)
         x = self.fc(x)
         # x = self.features(x)

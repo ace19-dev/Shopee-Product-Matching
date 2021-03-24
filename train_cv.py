@@ -28,8 +28,7 @@ from datasets.sampler import ImbalancedDatasetSampler
 from option import Options
 from training.lr_scheduler import LR_Scheduler
 from training.optimizer import Lookahead
-from training._loss import FocalLoss2
-from training.losses import *
+from training.losses import FocalLoss
 from training.bi_tempered_loss import BiTemperedLogisticLoss
 from training.taylor_cross_entropy_loss import TaylorCrossEntropyLoss
 from training.metrics import *
@@ -402,7 +401,7 @@ def main():
                                            num_cls=NUM_CLASS, smoothing=0.1)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        # criterion = FocalLoss2()
+        # criterion = FocalLoss()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         # https://github.com/shengliu66/ELR
@@ -421,18 +420,12 @@ def main():
         # optimizer = AdamP([{'params': model.parameters()},
         #                    {'params': metric_fc.parameters()}],
         #                   lr=args.lr, weight_decay=args.weight_decay)
-        optimizer = AdamP(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = AdamP(model.parameters(), lr=args.lr, betas=(0.9, 0.999),
+                          weight_decay=args.weight_decay)
         # optimizer = torch.optim.Adam([{'params': model.parameters()},
         #                   {'params': metric_fc.parameters()}],
         #                  lr=args.lr, weight_decay=args.weight_decay)
-        # optimizer = Lookahead(optimizer)
-
-        # TODO: change scheduler: CosineAnnealingWarmRestarts
-        scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
-                                 len(train_loader) // args.batch_size,
-                                 args.lr_step, warmup_epochs=3)
-        # scheduler = \
-        #     torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
+        optimizer = Lookahead(optimizer)
 
         if args.cuda:
             model.cuda()
@@ -482,6 +475,13 @@ def main():
                 print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
             else:
                 raise RuntimeError("=> no resume checkpoint found at '{}'".format(args.resume))
+
+        # TODO: change scheduler: CosineAnnealingWarmRestarts
+        scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
+                                 len(train_loader) // args.batch_size,
+                                 args.lr_step, warmup_epochs=5)
+        # scheduler = \
+        #     torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
 
         start = timeit.default_timer()
         for epoch in range(args.start_epoch, args.epochs + 1):
