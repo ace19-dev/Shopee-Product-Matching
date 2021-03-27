@@ -15,7 +15,7 @@ class Options():
         parser.add_argument('--output', type=str,
                             default='experiments',
                             help='output directory name')
-        parser.add_argument('--dataset', type=str, default='cassava',
+        parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
         # model params
         parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
@@ -35,7 +35,7 @@ class Options():
                             metavar='N', help='the epoch number to start (default: 1)')
         parser.add_argument('--workers', type=int, default=4,
                             metavar='N', help='dataloader threads')
-        # lr setting, ViT: 0.0001, tf_efficientnet_b4_ns: 0.001
+        # lr: tf_efficientnet_b4_ns w/ cosine-softmax: 0.001
         parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
@@ -79,9 +79,11 @@ class Options():
         # parser.add_argument('--output-path', type=str,
         #                     default='/home/ace19/dl_data/deepfake-detection-challenge/face_datasets/grad-cam',
         #                     help='Input image path')
-        parser.add_argument('--beta', default=0.8, type=float,
+        parser.add_argument('--beta', default=0.9, type=float,
                             help='hyperparameter beta')
-        parser.add_argument('--cutmix_prob', default=0.5, type=float,
+        # parser.add_argument('--cutmix_prob', default=0.5, type=float,
+        #                     help='cutmix probability')
+        parser.add_argument('--cutmix_prob', default=0.6, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')

@@ -55,6 +55,7 @@ class TaylorCrossEntropyLoss(nn.Module):
         self.taylor_softmax = TaylorSoftmax(dim=1, n=n)
         self.reduction = reduction
         self.ignore_index = ignore_index
+        self.smoothing = smoothing
         self.lab_smooth = LabelSmoothingLoss(num_cls, smoothing=smoothing)
 
     def forward(self, logits, labels):
@@ -74,6 +75,10 @@ class TaylorCrossEntropyLoss(nn.Module):
         loss = self.lab_smooth(log_probs, labels)
 
         return loss
+
+    def __str__(self):
+        print('smoothing: ' + str(self.smoothing))
+        print('self.taylor_softmax: ' + str(self.taylor_softmax))
 
 
 class LabelSmoothingLoss(nn.Module):

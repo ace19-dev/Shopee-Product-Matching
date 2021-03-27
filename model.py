@@ -56,7 +56,7 @@ def num_flat_features(x):
 
 class ArcModule(nn.Module):
     # margin = 0.5 # 0 for faster convergence, larger may be beneficial
-    def __init__(self, in_features, out_features, s=20, m=0.5):
+    def __init__(self, in_features, out_features, s=10, m=0.5):
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -127,23 +127,27 @@ class Model(nn.Module):
         elif self.backbone.startswith('tf_efficientnet_b5'):
             in_channels = 2048
 
-        self.head = nn.Sequential(
-            View(-1, in_channels),
-            nn.Linear(in_channels, nclass),
-        )
+        # self.head = nn.Sequential(
+        #     View(-1, in_channels),
+        #     nn.Linear(in_channels, nclass),
+        # )
 
         # for cosine-softmax
-        # # self.fc_scale = 12 * 12  # effinet-b1
+        # self.fc_scale = 12 * 12  # effinet-b4
         self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
         self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
         self.fc = nn.Linear(in_channels, in_channels)
-        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
-        self.dropout = nn.Dropout(p=0.2, inplace=True)
-        # self.bn2 = nn.BatchNorm2d(in_channels, eps=1e-05)
-        self.features = nn.BatchNorm1d(in_channels, eps=1e-05)
+        # self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        # self.dropout = nn.Dropout(p=0.2, inplace=True)
+        # # self.bn2 = nn.BatchNorm2d(in_channels, eps=1e-05)
+        # self.features = nn.BatchNorm1d(in_channels, eps=1e-05)
         # self.flatten = Flatten()
         # nn.init.constant_(self.features.weight, 1.0)
         # self.features.weight.requires_grad = False
+        # self.conv = nn.Conv2d(in_channels, in_channels, kernel_size=(3, 3),
+        #                       stride=(1, 1), bias=False)
+        # self.bn = nn.BatchNorm2d(in_channels, eps=1e-05)
+        # self.swishme = timm.models.layers.Swish()
 
         # # for arcface
         # self.in_features = self.pretrained.classifier.in_features
@@ -171,6 +175,12 @@ class Model(nn.Module):
             x = self.pretrained.conv_head(x)
             x = self.pretrained.bn2(x)
             x = self.pretrained.act2(x)
+            # x = self.conv(x)
+            # x = self.bn(x)
+            # x = self.pretrained.act2(x)
+            # x = self.conv(x)
+            # x = self.bn(x)
+            # x = self.pretrained.act2(x)
             x = self.pretrained.global_pool(x)
             # return self.pretrained.classifier(x)
 
@@ -207,7 +217,6 @@ class Model(nn.Module):
         # x = F.dropout2d(x, p=0.2)
         # x = self.dropout(x)
         x = self.fc(x)
-        # x = self.features(x)
 
         features = x
         # Features in rows, normalize axis 1.
@@ -224,7 +233,7 @@ class Model(nn.Module):
         # #   https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
         # ##################
         # # comment global_pooling
-        # features = self.bn1(features)
+        # features = self.bn1(x)
         # features = self.dropout(features)
         # features = features.view(features.size(0), -1)
         # features = self.fc1(features)

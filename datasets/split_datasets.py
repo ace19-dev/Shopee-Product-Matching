@@ -161,10 +161,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--source',
                         type=str,
-                        default='/home/ace19/dl_data/shopee-product-matching-old',
+                        default='/home/ace19/dl_data/shopee-product-matching',
                         help='Where is train image to load')
     parser.add_argument('--target', type=str,
-                        default='/home/ace19/dl_data/shopee-product-matching-old/fold',
+                        default='/home/ace19/dl_data/shopee-product-matching/fold',
                         help='directory to save splited dataset')
 
     args = parser.parse_args()

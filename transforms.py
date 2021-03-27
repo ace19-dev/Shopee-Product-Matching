@@ -134,8 +134,7 @@ def training_augmentation3():
         A.RandomBrightnessContrast(brightness_limit=0.2, p=0.5),
         A.HueSaturationValue(p=0.5),
         A.ShiftScaleRotate(p=0.5),
-        A.CoarseDropout(max_holes=5, p=0.5),
-        # A.CoarseDropout(p=0.5),   # TODO:
+        A.CoarseDropout(max_holes=4, p=0.5),
         A.Normalize(),
         ToTensorV2(),
     ]
@@ -199,30 +198,6 @@ def test_augmentation():
 
     test_transform = [
         A.Resize(CROP_HEIGHT, CROP_WIDTH),
-        A.Normalize(),
-        ToTensorV2(),
-    ]
-    return A.Compose(test_transform)
-
-
-def test_augmentation2():
-    """Add paddings to make image shape divisible by 32"""
-    # test_transform = [
-    #     transforms.Resize((CROP_HEIGHT, CROP_WIDTH)),
-    #     # transforms.CenterCrop((448, 448)),
-    #     transforms.ToTensor(),
-    #     # test norm
-    #     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-    #                          std=[0.229, 0.224, 0.225]),
-    #     # # TTA
-    #     # TenCrop(384),
-    #     # # returns a 4D tensor
-    #     # Lambda(lambda crops: torch.stack([normalize(ToTensor()(crop)) for crop in crops])),
-    # ]
-    # return transforms.Compose(test_transform)
-
-    test_transform = [
-        A.Resize(640, 640),
         A.Normalize(),
         ToTensorV2(),
     ]

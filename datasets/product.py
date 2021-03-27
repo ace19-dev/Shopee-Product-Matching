@@ -39,6 +39,7 @@ class ProductDataset(data.Dataset):
 
         return image, self.labels[index], image_id
 
+    # TODO:
     # def __str__(self):
     #     label1 = (self.df['label'] == 0).sum()
     #     label2 = (self.df['label'] == 1).sum()
