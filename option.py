@@ -18,7 +18,7 @@ class Options():
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
         # model params
-        parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
+        parser.add_argument('--model', type=str, default='bert',
                             help='network model type (default: tf_efficientnet_b4_ns)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
@@ -59,8 +59,8 @@ class Options():
                             default=None,
                             # default='pre-trained/noisy-student-efficientnet-b2.pth',
                             # 'efficientnet-b7_ns_aa-original-mstd0.5_re_100k_v4_cad79a/snapshot_100000.fp16.pth',
-                            # default='experiments/shopee-product-matching/tf_efficientnet_b4_ns/'
-                            #         '(2021-03-15_01:31:23)cassava_fold3_260x260_tf_efficientnet_b4_ns_acc(53.28467)_loss(0.12954)_checkpoint20.pth.tar',
+                            # default='experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/'
+                            #         '(2021-03-17_21:10:32)product_fold3_380x380_tf_efficientnet_b4_ns_acc(54.97810)_loss(0.26047)_checkpoint30.pth.tar',
                             help='put the path to resuming file if needed')
         parser.add_argument('--checkpoint_name', type=str, default='product',
                             help='set the checkpoint name')
@@ -83,7 +83,7 @@ class Options():
                             help='hyperparameter beta')
         # parser.add_argument('--cutmix_prob', default=0.5, type=float,
         #                     help='cutmix probability')
-        parser.add_argument('--cutmix_prob', default=0.6, type=float,
+        parser.add_argument('--cutmix_prob', default=0.7, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')

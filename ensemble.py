@@ -13,9 +13,9 @@ from tqdm import tqdm
 
 # import models.model_zoo as models
 import transformer
-import model as M
+from models import model as M
 from option import Options
-from datasets.product import NUM_CLASS, ProductTestDataset, ProductDataset
+from datasets.product import NUM_CLASS, ProductTestDataset
 from training._loss import *
 from training.taylor_cross_entropy_loss import TaylorCrossEntropyLoss
 from utils.training_helper import AverageMeter

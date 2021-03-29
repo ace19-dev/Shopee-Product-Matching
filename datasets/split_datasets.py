@@ -12,7 +12,9 @@
 import argparse
 import glob
 import os
+import time
 import random
+import logging
 from collections import Counter, defaultdict
 
 import numpy as np
@@ -22,44 +24,55 @@ from sklearn.model_selection import GroupKFold, StratifiedKFold
 from sklearn.utils import shuffle
 
 
-# TODO: modify
-def create_label_column():
+def create_labels():
     train_df = pd.read_csv(os.path.join(args.source, 'train_ori.csv'))
 
     # https://www.kaggle.com/vicioussong/rapids-tfidfvectorizer-cv-0-734
-    label_group_to_label = train_df.groupby('label_group').posting_id.agg('unique').to_dict()
-    for lbl, (key, value) in enumerate(sorted(label_group_to_label.items())):
+    label_posting_ids = train_df.groupby('label_group').posting_id.agg('unique').to_dict()
+    for _label, (key, value) in enumerate(sorted(label_posting_ids.items())):
         idxs = train_df.loc[train_df['posting_id'].isin(value)].index.tolist()
         for idx in idxs:
-            train_df.loc[idx, 'label'] = lbl
+            train_df.loc[idx, 'label'] = _label
+
+    # tmp = train.groupby('label_group').posting_id.agg('unique').to_dict()
+    # train['target'] = train.label_group.map(tmp)
+    # print('train shape is', train.shape)
+    # train.head()
 
     train_df.to_csv(os.path.join(args.source, 'train.csv'), index=False)
 
 
-def split_train_val3():
+def split_train_val(logger):
     # NUM_CLASSES = 5
 
     train_df = pd.read_csv(os.path.join(args.source, 'train.csv'))
-    print('total: ', len(train_df))
-    print('train shape: ', train_df.shape, '\n')
+    logger.info('total: {}'.format(len(train_df)))
+    logger.info('train shape: {}\n'.format(train_df.shape))
     # # delete old unusual
     # train_df = train_df.loc[~train_df.filename.isin(
     #     ["64faf0b221af4767ba8c167b228fde00.jpg", "d946ee19ac1d2997bac5f18ce75656cb.jpg"])].reset_index(drop=True)
 
     # delete outliers
     # train_df = train_df[~train_df['image_id'].isin(OUTLIERS)]
-    # print('total:\n', len(train_df), '\n')
+    # logger.info('total:\n', len(train_df), '\n')
     # delete unusual
     # train_df = train_df[~train_df['image_id'].isin(UNUSUAL)]
-    # print('total:\n', len(train_df), '\n')
+    # logger.info('total:\n', len(train_df), '\n')
 
-    print('unique posting id: ', len(train_df['posting_id'].unique()))
-    print('unique image: ', len(train_df['image'].unique()))
-    print('unique image phash: ', len(train_df['image_phash'].unique()))
-    print('unique title: ', len(train_df['title'].unique()))
-    print('unique label group: ', len(train_df['label_group'].unique()))  # 11014
-    print(train_df['image'].value_counts())
-    # print(train_df['label_group'].astype(int))
+    # 가장 긴 문자열의 길이: 357
+    # https://www.javaer101.com/ko/article/2975648.html
+    print(train_df.title.map(lambda x: len(x)).max())
+
+    logger.info('unique posting id: {}'.format(len(train_df['posting_id'].unique())))
+    logger.info('unique image: {}'.format(len(train_df['image'].unique())))
+    logger.info('unique image phash: {}'.format(len(train_df['image_phash'].unique())))
+    logger.info('unique title: {}'.format(len(train_df['title'].unique())))
+    logger.info('unique label group: {}'.format(len(train_df['label_group'].unique())))  # 11014
+    logger.info('\n')
+    logger.info('image counts:')
+    logger.info(train_df['image'].value_counts())
+    logger.info('\n\n')
+    # logger.info(train_df['label_group'].astype(int))
 
     # https://stackoverflow.com/questions/50375985/pandas-add-column-with-value-based-on-condition-based-on-other-columns
     # train_df['label2'] = np.where(train_df['label'].isin([0, 1, 2, 3]), 1, 0)
@@ -75,26 +88,27 @@ def split_train_val3():
     # sklearn.model_selection.KFold(n_splits=5, shuffle=True, random_seed=42)
     gkf = GroupKFold(n_splits=5)
     x_shuffled, y_shuffled, groups_shuffled = \
-        shuffle(train_df, train_df['label'], train_df['image'].tolist(), random_state=8)
+        shuffle(train_df, train_df['label'], train_df['posting_id'].tolist(), random_state=8)
     results = []
     for idx, (train_idx, val_idx) in enumerate(gkf.split(x_shuffled, y_shuffled, groups=groups_shuffled)):
         train_fold = train_df.iloc[train_idx]
         val_fold = train_df.iloc[val_idx]
 
-        print('\nsplit: ', idx)
+        logger.info('split: {} \n'.format(idx))
+        # logger.info('\n')
         # train = train_fold.groupby(by=['label'], as_index=False).sum()
-        # print('train_df:\n', train_fold.groupby(by=['label'], as_index=False).sum())
-        print('train_fold num: ', len(train_fold))
+        # logger.info('train_df:\n', train_fold.groupby(by=['label'], as_index=False).sum())
+        logger.info('train_fold num: {}'.format(len(train_fold)))
         num = len(train_fold.groupby(by=['label'], as_index=False))
-        print('label num: {}, \nlabel/train_fold: {:.3f}'.format(
+        logger.info('label num: {}, label/train_fold: {:.3f}'.format(
             num, num / len(train_fold)))
 
-        print('\nval_fold num: ', len(val_fold))
+        logger.info('val_fold num: {}'.format(len(val_fold)))
         num = len(val_fold.groupby(by=['label'], as_index=False))
-        print('label num: {}, \nlabel/val_fold: {:.3f}'.format(
+        logger.info('label num: {}, label/val_fold: {:.3f}'.format(
             num, num / len(val_fold)))
 
-        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+        logger.info('++++++++++++++++++++++++++++++++++++++++++++++++++++++')
         results.append((train_fold, val_fold))
 
     for i, splited in enumerate(results):
@@ -113,29 +127,29 @@ def split_train_val3():
     '''
 
 
-def make_train_npy():
-    train_df = pd.read_csv(os.path.join(args.source, 'train.csv'))
-    print('total:\n', len(train_df), '\n')
-
-    image_id = train_df['image_id'].tolist()
-    np.save(args.target + '/train_all_%d.npy' % (len(image_id)), image_id)
-
-
-def test_stratifiedkfold():
-    X = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-    y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
-    skf = StratifiedKFold(n_splits=4, shuffle=True)
-    for train_index, test_index in skf.split(X, y):
-        print("%s %s" % (train_index, test_index))
-
-
-def test_groupkfold():
-    X = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-    y = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32]
-    groups = ['a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c', 'c', 'd', 'd', 'd', 'd', 'd', 'd']
-    gkf = GroupKFold(n_splits=3)
-    for train_index, test_index in gkf.split(X, y, groups=groups):
-        print("%s %s" % (train_index, test_index))
+# def make_train_npy():
+#     train_df = pd.read_csv(os.path.join(args.source, 'train.csv'))
+#     logger.info('total:\n', len(train_df), '\n')
+#
+#     image_id = train_df['image_id'].tolist()
+#     np.save(args.target + '/train_all_%d.npy' % (len(image_id)), image_id)
+#
+#
+# def test_stratifiedkfold():
+#     X = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+#     y = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+#     skf = StratifiedKFold(n_splits=4, shuffle=True)
+#     for train_index, test_index in skf.split(X, y):
+#         print("%s %s" % (train_index, test_index))
+#
+#
+# def test_groupkfold():
+#     X = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+#     y = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32]
+#     groups = ['a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c', 'c', 'd', 'd', 'd', 'd', 'd', 'd']
+#     gkf = GroupKFold(n_splits=3)
+#     for train_index, test_index in gkf.split(X, y, groups=groups):
+#         print("%s %s" % (train_index, test_index))
 
 
 def main(args):
@@ -143,18 +157,25 @@ def main(args):
         if not os.path.exists(args.target):
             os.makedirs(args.target)
 
+    _time = time.strftime('%Y-%m-%d_%H:%M:%S')
+    log_file = '({})split_train_val.log'.format(_time)
+    final_log_file = args.target + '/' + log_file
+    head = '%(asctime)-15s %(message)s'
+    logging.basicConfig(filename=str(final_log_file), format=head)
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    console = logging.StreamHandler()
+    logging.getLogger('').addHandler(console)
+
     # https://www.kaggle.com/vishnurapps/undersanding-kfold-stratifiedkfold-and-groupkfold
     # test_groupkfold()
 
     # reference on https://www.kaggle.com/reighns/groupkfold-efficientbnet
-    # create_label_column()
-    split_train_val3()
+    # create_labels()
+    split_train_val(logger)
 
     # temp
     # make_train_npy()
-
-    # reference on https://www.kaggle.com/shonenkov/merge-external-data
-    # split_train_val2()
 
 
 if __name__ == '__main__':

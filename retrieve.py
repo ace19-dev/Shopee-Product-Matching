@@ -9,14 +9,11 @@ from tqdm import tqdm
 import time
 import pandas as pd
 
-import matplotlib.pyplot as plt
-from PIL import Image
-
 import torch
 import torch.nn as nn
 
 from datasets.product import ProductTestDataset
-import model as M
+from models import model as M
 import transformer
 from option import Options
 
@@ -254,8 +251,6 @@ def main():
     query_posid_list = []
 
     # query_label_list = []
-
-    from sklearn.neighbors import NearestNeighbors
 
     def retrieval():
         model.eval()

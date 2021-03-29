@@ -51,7 +51,7 @@ def get_rank():
     return torch.distributed.get_rank()
 
 
-def create_logger(args, args_desc, image_size):
+def create_logger(args, args_desc):
     root_output_dir = Path(args.output)
     # set up logger
     if not root_output_dir.exists():
@@ -68,7 +68,7 @@ def create_logger(args, args_desc, image_size):
     final_output_dir.mkdir(parents=True, exist_ok=True)
 
     time_str = time.strftime('%Y-%m-%d_%H:%M:%S')
-    log_file = '({}){}_{}_{}_lr({}).log'.format(time_str, cfg_name, image_size, args.model, args.lr)
+    log_file = '({}){}_{}_lr({}).log'.format(time_str, cfg_name, args.model, args.lr)
     final_log_file = final_output_dir / log_file
     head = '%(asctime)-15s %(message)s'
     logging.basicConfig(filename=str(final_log_file), format=head)
@@ -124,7 +124,7 @@ def display_data(fname, image):
         cv2.destroyAllWindows()
 
 
-def save_checkpoint(state, logger, args, loss, is_best, image_size, create_at, filename, foldname):
+def save_checkpoint(state, logger, args, loss, is_best, create_at, filename, foldname, image_size=None):
     _filename = '(' + create_at + ')' + filename + '_%s_%s_%s_acc(%s)_loss(%s)_checkpoint%s.pth.tar'
     # _filename = filename + '_checkpoint.pth.tar'
 
@@ -134,9 +134,14 @@ def save_checkpoint(state, logger, args, loss, is_best, image_size, create_at, f
         os.makedirs(directory)
 
     # save file per epoch
-    _filename = directory + _filename % (foldname, image_size, args.model,
-                                         str(format(state['acc_lst_val'][-1], ".5f")),
-                                         round(loss, 5), str(state['epoch']))
+    if image_size is not None:
+        _filename = directory + _filename % (foldname, image_size, args.model,
+                                             str(format(state['acc_lst_val'][-1], ".5f")),
+                                             round(loss, 5), str(state['epoch']))
+    else:
+        _filename = directory + _filename % (foldname, 'TEXT', args.model,
+                                             str(format(state['acc_lst_val'][-1], ".5f")),
+                                             round(loss, 5), str(state['epoch']))
     # save file
     torch.save(state, _filename)
     logger.info('Saving checkpoint to {}'.format(_filename))

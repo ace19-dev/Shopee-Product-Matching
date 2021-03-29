@@ -3,24 +3,22 @@ https://towardsdatascience.com/ensemble-methods-bagging-boosting-and-stacking-c9
 https://modulabs-biomedical.github.io/Bias_vs_Variance
 
 -> low bias, high variance
-
-1st place solution: https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/221957
-Our final submission first averaged the probabilities of the predicted classes of ViT and ResNext.
-This averaged probability vector was then merged with the predicted probabilities of EfficientnetB4 and CropNet
-in the second stage. For this purpose, the values were simply summed up -> 확율 누적.
-
 '''
 
 import pprint
 import timeit
 from tqdm import tqdm
 
-from tensorboardX import SummaryWriter
-from torch.autograd import Variable
+from transformers import BertTokenizer
+# from transformers import BertModel, BertConfig, AdamW
+from transformers import get_linear_schedule_with_warmup
 
-import transforms
-from models import model as M
-from datasets.product import ProductDataset, NUM_CLASS
+from tensorboardX import SummaryWriter
+# from torch.autograd import Variable
+
+# import transforms
+from models import text_model as M
+from datasets.product import ProductTextDataset, NUM_CLASS
 from datasets.sampler import ImbalancedDatasetSampler
 from option import Options
 from training.lr_scheduler import LR_Scheduler
@@ -33,55 +31,6 @@ best_pred = 0.0
 acc_lst_train = []
 acc_lst_val = []
 lr = 0.0
-
-IMAGE_SIZE = str(transforms.CROP_HEIGHT) + 'x' + \
-             str(transforms.CROP_WIDTH)
-
-
-def lr_step_func(epoch):
-    return ((epoch + 1) / (4 + 1)) ** 2 if epoch < -1 else 0.1 ** len(
-        [m for m in [8, 14] if m - 1 <= epoch])
-
-
-def mixup_data(x, y, alpha=1.0, use_cuda=True):
-    '''Returns mixed inputs, pairs of targets, and lambda'''
-    if alpha > 0:
-        lam = np.random.beta(alpha, alpha)
-    else:
-        lam = 1
-
-    batch_size = x.size()[0]
-    if use_cuda:
-        index = torch.randperm(batch_size).cuda()
-    else:
-        index = torch.randperm(batch_size)
-
-    mixed_x = lam * x + (1 - lam) * x[index, :]
-    y_a, y_b = y, y[index]
-    return mixed_x, y_a, y_b, lam
-
-
-def mixup_criterion(criterion, pred, y_a, y_b, lam):
-    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
-
-
-def rand_bbox(size, lam):
-    W = size[2]
-    H = size[3]
-    cut_rat = np.sqrt(1. - lam)
-    cut_w = int(W * cut_rat)
-    cut_h = int(H * cut_rat)
-
-    # uniform
-    cx = np.random.randint(W)
-    cy = np.random.randint(H)
-
-    bbx1 = np.clip(cx - cut_w // 2, 0, W)
-    bby1 = np.clip(cy - cut_h // 2, 0, H)
-    bbx2 = np.clip(cx + cut_w // 2, 0, W)
-    bby2 = np.clip(cy + cut_h // 2, 0, H)
-
-    return bbx1, bby1, bbx2, bby2
 
 
 def freeze_until(net, param_name):
@@ -115,8 +64,7 @@ def main():
     # local_rank = args.local_rank
     # torch.cuda.set_device(local_rank)
 
-    logger, log_file, final_output_dir, tb_log_dir, create_at = \
-        create_logger(args, args_desc, IMAGE_SIZE)
+    logger, log_file, final_output_dir, tb_log_dir, create_at = create_logger(args, args_desc)
     logger.info('-------------- params --------------')
     logger.info(pprint.pformat(args.__dict__))
 
@@ -137,7 +85,6 @@ def main():
         global best_pred, acc_lst_train, acc_lst_val
 
         local_step = 0
-        MIXUP_FLAG = False
 
         losses = AverageMeter()
         accs = AverageMeter()
@@ -146,92 +93,48 @@ def main():
 
         # last_time = time.time()
         tbar = tqdm(train_loader, desc='\r')
-        for batch_idx, (images, targets, fnames) in enumerate(tbar):
-            scheduler(optimizer, batch_idx, epoch, best_pred)
+        for batch_idx, (input_ids, input_mask, labels, pos_id) in enumerate(tbar):
+            # scheduler(optimizer, batch_idx, epoch, best_pred)
 
             if args.cuda:
-                images, targets = images.cuda(), targets.cuda()
+                input_ids, input_mask, labels = \
+                    input_ids.cuda(), input_mask.cuda(), labels.cuda()
 
             local_step += 1
 
-            # TODO: move cutmix/fmix/mixup func to ProductDataset .py
-            # https://www.kaggle.com/sebastiangnther/cassava-leaf-disease-vit-tpu-training
-            # CutMix (from https://github.com/clovaai/CutMix-PyTorch)
-            r = np.random.rand(1)
-            if args.beta > 0 and r < args.cutmix_prob:
-                # print('in cutmix')
-                # generate mixed sample
-                lam = np.random.beta(args.beta, args.beta)
-                rand_index = torch.randperm(images.size()[0]).cuda()
-                target_a = targets
-                target_b = targets[rand_index]
-                bbx1, bby1, bbx2, bby2 = rand_bbox(images.size(), lam)
-                images[:, :, bbx1:bbx2, bby1:bby2] = images[rand_index, :, bbx1:bbx2, bby1:bby2]
-                # adjust lambda to exactly match pixel ratio
-                lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
+            # outputs = model(images, targets)  # arcface
+            # cosine-softmax
+            # https://huggingface.co/transformers/model_doc/bert.html
+            _, outputs = model(input_ids, input_mask)
+            # print('outputs:', outputs.shape)
+            # print('targets:', targets.shape)
 
-                # outputs = model(images, targets)  # arcface
-                _, outputs = model(images)    # cosine-softmax
-
-                # loss = criterion(activations=outputs,
-                #                  labels=torch.nn.functional.one_hot(target_a),
-                #                  t1=0.5, t2=1.5) * lam + \
-                #        criterion(activations=outputs,
-                #                  labels=torch.nn.functional.one_hot(target_b),
-                #                  t1=0.5, t2=1.5) * (1. - lam)
-                loss = criterion(outputs, target_a) * lam + \
-                       criterion(outputs, target_b) * (1. - lam)
-            else:
-                r = np.random.rand(1)
-                if r < args.mixup_prob:
-                    MIXUP_FLAG = True
-                    # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
-                    inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
-                    inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    # outputs = model(images, targets)  # arcface
-                    _, outputs = model(images)    # cosine-softmax
-                    loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
-                    # train_loss += loss.data[0]
-                    # _, preds = torch.max(outputs.data, 1)
-                    # total += targets.size(0)
-                    # correct += (lam * preds.eq(targets_a.data).cpu().sum().float()
-                    #             + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float())
-                else:
-                    MIXUP_FLAG = False
-                    # outputs = model(images, targets)  # arcface
-                    _, outputs = model(images)    # cosine-softmax
-                    # print('outputs:', outputs.shape)
-                    # print('targets:', targets.shape)
-
-                    # loss = criterion(activations=outputs,
-                    #                  labels=torch.nn.functional.one_hot(targets),
-                    #                  t1=0.5, t2=1.5)
-                    loss = criterion(outputs, targets)
+            # loss = criterion(activations=outputs,
+            #                  labels=torch.nn.functional.one_hot(targets),
+            #                  t1=0.5, t2=1.5)
+            loss = criterion(outputs, labels)
 
             preds = torch.argmax(outputs.data, 1)
 
             # compute gradient and do SGD step
             optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
-            # scheduler.step()
 
-            batch_size = float(images.size(0))
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
+            optimizer.step()
+            scheduler.step()
+
+            batch_size = float(input_ids.size(0))
             # https://stackoverflow.com/questions/9452775/converting-numpy-dtypes-to-native-python-types
             losses.update(loss.data.cpu().numpy().item(), batch_size)
-            if MIXUP_FLAG:
-                correct = (lam * preds.eq(targets_a.data).cpu().sum().float() +
-                           (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
-                accs.update(correct.cpu().numpy().item(), batch_size)
-
-            else:
-                # https://discuss.pytorch.org/t/trying-to-pass-too-many-cpu-scalars-to-cuda-kernel/87757/4
-                correct = torch.sum(preds == targets.data)
-                accs.update(correct.cpu().numpy().item(), batch_size)
+            # https://discuss.pytorch.org/t/trying-to-pass-too-many-cpu-scalars-to-cuda-kernel/87757/4
+            correct = torch.sum(preds == labels.data)
+            accs.update(correct.cpu().numpy().item(), batch_size)
 
             if batch_idx % 10 == 0:
                 tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
-                    epoch, batch_idx * len(images), len(train_loader.dataset),
+                    epoch, batch_idx * len(input_ids), len(train_loader.dataset),
                            100. * batch_idx / len(train_loader), losses.avg, accs.avg))
 
         logger.info('[Train] Loss: {:.4f} Acc: {:.4f}'.format(losses.avg, accs.avg))
@@ -252,30 +155,24 @@ def main():
         model.eval()
 
         tbar = tqdm(val_loader, desc='\r')
-        for batch_idx, (images, targets, fnames) in enumerate(tbar):
+        for batch_idx, (input_ids, input_mask, labels, pos_id) in enumerate(tbar):
             if args.cuda:
-                images, targets = images.cuda(), targets.cuda()
+                input_ids, input_mask, labels = \
+                    input_ids.cuda(), input_mask.cuda(), labels.cuda()
 
             with torch.no_grad():
                 # outputs = model(images, targets)  # arcface
-                _, outputs = model(images)  # cosine-softmax
+                # cosine-softmax
+                _, outputs = model(input_ids, input_mask)
 
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
                 #                        t1=0.5, t2=1.5)
-                # # ------ TTA ---------
-                # images = torch.stack([images, images.flip(-1), images.flip(-2), images.flip(-1, -2),
-                #                  images.transpose(-1, -2), images.transpose(-1, -2).flip(-1),
-                #                  images.transpose(-1, -2).flip(-2), images.transpose(-1, -2).flip(-1, -2)], 0)
-                # images = images.view(-1, 3, transformer.CROP_HEIGHT, transformer.CROP_WIDTH)
-                # outputs = model(images)
-                # outputs = outputs.view(args.batch_size, 8, -1).mean(1)
-
-                loss = criterion(outputs, targets)
+                loss = criterion(outputs, labels)
                 preds = torch.argmax(outputs.data, 1)
-                correct = torch.sum(preds == targets.data)
+                correct = torch.sum(preds == labels.data)
 
-                batch_size = float(images.size(0))
+                batch_size = float(input_ids.size(0))
                 losses.update(loss.data.cpu().numpy().item(), batch_size)
                 accs.update(correct.cpu().numpy().item(), batch_size)
 
@@ -303,8 +200,12 @@ def main():
             'acc_lst_train': acc_lst_train,
             'acc_lst_val': acc_lst_val,
         }, logger=logger, args=args, loss=losses.avg, is_best=is_best,
-            image_size=IMAGE_SIZE, create_at=create_at, filename=args.checkpoint_name,
-            foldname=valset.fold_name())
+            create_at=create_at, filename=args.checkpoint_name, foldname=valset.fold_name())
+
+    logger.info('\n-------------- tokenizer --------------')
+    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
+    logger.info(tokenizer)
+    logger.info('\n')
 
     for train_filename, val_filename in zip(train_npzs, val_npzs):
         logger.info('****************************')
@@ -328,36 +229,24 @@ def main():
         logger.info('-------------- seed --------------')
         logger.info(str(args.seed) + '\n')
 
-        logger.info('-------------- image size --------------')
-        logger.info(IMAGE_SIZE + '\n')
-
-        trainset = ProductDataset(data_dir=args.dataset_root,
-                                  fold=[train_filename],
-                                  csv=['train.csv'],
-                                  mode='train',
-                                  transform=transforms.training_augmentation3(), )
+        trainset = ProductTextDataset(data_dir=args.dataset_root,
+                                      fold=[train_filename],
+                                      csv=['train.csv'],
+                                      mode='train',
+                                      tokenizer=tokenizer)
         # train_sampler = torch.utils.data.distributed.DistributedSampler(
         #     trainset, shuffle=True)
-        valset = ProductDataset(data_dir=args.dataset_root,
-                                fold=[val_filename],
-                                csv=['train.csv'],
-                                mode='val',
-                                transform=transforms.validation_augmentation())
+        valset = ProductTextDataset(data_dir=args.dataset_root,
+                                    fold=[val_filename],
+                                    csv=['train.csv'],
+                                    mode='val',
+                                    tokenizer=tokenizer)
         # val_sampler = torch.utils.data.distributed.DistributedSampler(
         #     valset, shuffle=False)
-
-        logger.info('-------------- train transform --------------')
-        logger.info(transforms.training_augmentation3())
-        logger.info('\n-------------- valid transform --------------')
-        logger.info(transforms.validation_augmentation())
 
         logger.info('\n-------------- dataset --------------')
         logger.info(trainset)
         logger.info(valset)
-        # logger.info('-------------- train transforms --------------')
-        # logger.info(pprint.pformat(transforms.training_augmentation().transforms.transforms) + '\n')
-        # logger.info('-------------- validation transforms --------------')
-        # logger.info(pprint.pformat(transforms.validation_augmentation().transforms.transforms) + '\n')
 
         train_loader = torch.utils.data.DataLoader(trainset,
                                                    batch_size=args.batch_size,
@@ -373,8 +262,9 @@ def main():
                                                  num_workers=args.workers,
                                                  pin_memory=True)
 
-        model = M.Model(backbone=args.model, nclass=NUM_CLASS)
-        # model.half()  # to save space.
+        # config = BertConfig.from_pretrained('bert-base-multilingual-cased')
+        # model = BertModel(config)
+        model = M.Model(backbone='Bert', nclass=NUM_CLASS)
         logger.info('\n-------------- model details --------------')
         logger.info(model)
 
@@ -395,8 +285,8 @@ def main():
         # criterion = FocalLoss()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
-        logger.info('\n-------------- loss details --------------')
-        logger.info(criterion.__str__())
+        # logger.info('\n-------------- loss details --------------')
+        # logger.info(criterion.__str__())
 
         logger.info('\n-------------- optimizer details --------------')
         # optimizer = torch.optim.SGD(model.parameters(),
@@ -412,20 +302,21 @@ def main():
         # logger.info(optimizer.__str__())
 
         logger.info('\n-------------- scheduler details --------------')
-        # TODO: change scheduler: CosineAnnealingWarmRestarts
         # scheduler = \
         #     torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 5, args.epochs)
-        scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
-                                 len(train_loader) // args.batch_size,
-                                 args.lr_step, warmup_epochs=5)
-        # scheduler = \
-        #     torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
+        # scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
+        #                          len(train_loader) // args.batch_size,
+        #                          args.lr_step, warmup_epochs=5)
+        total_steps = len(train_loader) * args.epochs
+        scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                    num_warmup_steps=0,
+                                                    num_training_steps=total_steps)
         logger.info(scheduler.__str__())
 
         if args.cuda:
             model.cuda()
             model = nn.DataParallel(model)
-            criterion.cuda()
+            # criterion.cuda()
 
         # for ps in model.parameters():
         #     dist.broadcast(ps, 0)

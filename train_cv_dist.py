@@ -3,34 +3,21 @@ borrowed from https://github.com/deepinsight/insightface/blob/master/recognition
 '''
 
 import pprint
-import random
 import timeit
 from tqdm import tqdm
 
 from tensorboardX import SummaryWriter
-import torch.distributed as dist
-import torch.nn.functional as F
 import torch.utils.data.distributed
 from torch.nn.utils import clip_grad_norm_
-from torch.autograd import Variable
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, CosineAnnealingLR, ReduceLROnPlateau
 
 import transformer
-import model as M
-from partial_fc import PartialFC
+from models import model as M
 from datasets.product import ProductDataset, NUM_CLASS
-from datasets.sampler import ImbalancedDatasetSampler
 from option import Options
-from training.lr_scheduler import LR_Scheduler
-from training.optimizer import Lookahead
-from training._loss import FocalLoss2
 from training.losses import *
-from training.bi_tempered_loss import BiTemperedLogisticLoss
-from training.taylor_cross_entropy_loss import TaylorCrossEntropyLoss
 from training.metrics import *
 from utils.training_helper import *
 from utils.image_helper import *
-from utils.utils_amp import *
 from utils.utils_callbacks import *
 
 # global variable
