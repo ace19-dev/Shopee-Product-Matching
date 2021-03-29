@@ -105,7 +105,7 @@ class CosineSoftmaxModule(nn.Module):
         self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
         self.fc = nn.Linear(in_channels, in_channels)
         # self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
-        self.dropout = nn.Dropout(p=0.2, inplace=True)
+        self.dropout = nn.Dropout(p=0.2, inplace=False)
         # # self.bn2 = nn.BatchNorm2d(in_channels, eps=1e-05)
         # self.features = nn.BatchNorm1d(in_channels, eps=1e-05)
         # self.flatten = Flatten()
@@ -129,7 +129,7 @@ class CosineSoftmaxModule(nn.Module):
         # COSINE-SOFTMAX
         ##################
         # x = x.view(-1, num_flat_features(x))
-        # x = F.dropout2d(x, p=0.2)
+        x = self.dropout(x)
         x = self.fc(x)
 
         features = x
