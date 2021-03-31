@@ -9,7 +9,7 @@ import pprint
 import timeit
 from tqdm import tqdm
 
-from transformers import BertTokenizer
+from transformers import BertTokenizer, AutoTokenizer
 # from transformers import BertModel, BertConfig, AdamW
 from transformers import get_linear_schedule_with_warmup
 
@@ -95,7 +95,7 @@ def main():
         # last_time = time.time()
         tbar = tqdm(train_loader, desc='\r')
         for batch_idx, (input_ids, input_mask, labels, pos_id) in enumerate(tbar):
-            # scheduler(optimizer, batch_idx, epoch, best_pred)
+            scheduler(optimizer, batch_idx, epoch, best_pred)
 
             if args.cuda:
                 input_ids, input_mask, labels = \
@@ -103,12 +103,15 @@ def main():
 
             local_step += 1
 
-            # outputs = model(images, targets)  # arcface
+            # # ArcFace
+            # outputs = model(input_ids, input_mask, labels)
             # cosine-softmax
             # https://huggingface.co/transformers/model_doc/bert.html
             _, outputs = model(input_ids, input_mask)
             # print('outputs:', outputs.shape)
-            # print('targets:', targets.shape)
+            # print('labels:', labels.shape)
+            # print('outputs:', outputs)
+            # print('labels:', labels)
 
             # loss = criterion(activations=outputs,
             #                  labels=torch.nn.functional.one_hot(targets),
@@ -116,15 +119,13 @@ def main():
             loss = criterion(outputs, labels)
 
             preds = torch.argmax(outputs.data, 1)
-
+            # print('preds:', preds)
             # compute gradient and do SGD step
             optimizer.zero_grad()
             loss.backward()
-
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
-            scheduler.step()
+            # scheduler.step()
 
             batch_size = float(input_ids.size(0))
             # https://stackoverflow.com/questions/9452775/converting-numpy-dtypes-to-native-python-types
@@ -162,7 +163,8 @@ def main():
                     input_ids.cuda(), input_mask.cuda(), labels.cuda()
 
             with torch.no_grad():
-                # outputs = model(images, targets)  # arcface
+                # # ArcFace
+                # outputs = model(input_ids, input_mask, labels)
                 # cosine-softmax
                 _, outputs = model(input_ids, input_mask)
 
@@ -204,7 +206,7 @@ def main():
             create_at=create_at, filename=args.checkpoint_name, foldname=valset.fold_name())
 
     logger.info('\n-------------- tokenizer --------------')
-    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
+    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-uncased', do_lower_case=False)
     logger.info(tokenizer)
     logger.info('\n')
 
@@ -279,11 +281,11 @@ def main():
         # https://github.com/fhopfmueller/bi-tempered-loss-pytorch
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
-        # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-        #                                    num_cls=NUM_CLASS, smoothing=0.1)
+        criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
+                                           num_cls=NUM_CLASS, smoothing=0.1)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        criterion = FocalLoss()
+        # criterion = FocalLoss()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         # logger.info('\n-------------- loss details --------------')
@@ -305,19 +307,19 @@ def main():
         logger.info('\n-------------- scheduler details --------------')
         # scheduler = \
         #     torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 5, args.epochs)
-        # scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
-        #                          len(train_loader) // args.batch_size,
-        #                          args.lr_step, warmup_epochs=5)
+        scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
+                                 len(train_loader) // args.batch_size,
+                                 args.lr_step, warmup_epochs=3)
         total_steps = len(train_loader) * args.epochs
-        scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                    num_warmup_steps=0,
-                                                    num_training_steps=total_steps)
+        # scheduler = get_linear_schedule_with_warmup(optimizer,
+        #                                             num_warmup_steps=(total_steps/args.epochs)*3,
+        #                                             num_training_steps=total_steps)
         logger.info(scheduler.__str__())
 
         if args.cuda:
             model.cuda()
             model = nn.DataParallel(model)
-            # criterion.cuda()
+            criterion.cuda()
 
         # for ps in model.parameters():
         #     dist.broadcast(ps, 0)

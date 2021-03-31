@@ -11,7 +11,7 @@ import torch.utils.data as data
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 NUM_CLASS = 11014
-MAX_LEN = 512   # TODO: check title max
+MAX_LEN = 512  # TODO: check title max
 
 
 class ProductTextDataset(data.Dataset):
@@ -100,22 +100,8 @@ class ProductTextTestDataset(data.Dataset):
         return torch.tensor(self.input_ids[index]), \
                torch.tensor(self.attention_masks[index]), self.posting_id[index]
 
-    def __str__(self):
-        length = len(self)
-
-        string = ''
-        string += '\tmode  = %s\n' % self.mode
-        string += '\tfold = %s\n' % self.fold
-        string += '\tcsv   = %s\n' % str(self.csv)
-        string += '\t\tlen  = %5d\n' % length
-
-        return string
-
     def __len__(self):
         return len(self.input_ids)
-
-    def fold_name(self):
-        return self.fold[0].split('_')[1]
 
 
 class ProductDataset(data.Dataset):

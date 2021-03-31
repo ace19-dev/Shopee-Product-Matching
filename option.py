@@ -18,16 +18,16 @@ class Options():
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
         # model params
-        parser.add_argument('--model', type=str, default='bert',
+        parser.add_argument('--model', type=str, default='seresnext50_32x4d',
                             help='network model type (default: tf_efficientnet_b4_ns)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
         # parser.add_argument('--widen', type=int, default=4, metavar='N',
         #     help='widen factor of the network (default: 4)')
         # training hyper params
-        parser.add_argument('--batch-size', type=int, default=32,
+        parser.add_argument('--batch-size', type=int, default=64,
                             metavar='N', help='batch size for training (default: 128)')
-        parser.add_argument('--test-batch-size', type=int, default=32,
+        parser.add_argument('--test-batch-size', type=int, default=64,
                             metavar='N', help='batch size for testing (default: 256)')
         parser.add_argument('--epochs', type=int, default=30, metavar='N',
                             help='number of epochs to train (default: 600)')
@@ -36,7 +36,7 @@ class Options():
         parser.add_argument('--workers', type=int, default=4,
                             metavar='N', help='dataloader threads')
         # lr: tf_efficientnet_b4_ns w/ cosine-softmax: 0.001
-        parser.add_argument('--lr', type=float, default=0.00001, metavar='LR',
+        parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
@@ -87,7 +87,7 @@ class Options():
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')
-        parser.add_argument('--mixup_prob', default=0.0, type=float,
+        parser.add_argument('--mixup_prob', default=0.2, type=float,
                             help='mixup probability')
         self.parser = parser
 
