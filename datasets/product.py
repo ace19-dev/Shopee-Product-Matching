@@ -10,7 +10,8 @@ import torch.utils.data as data
 
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-NUM_CLASS = 11014
+# NUM_CLASS = 11014
+NUM_CLASS = 42
 MAX_LEN = 512  # TODO: check title max
 
 
@@ -114,9 +115,9 @@ class ProductDataset(data.Dataset):
 
         samples = list(np.concatenate([np.load(data_dir + '/fold/%s' % f, allow_pickle=True) for f in self.fold]))
         self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
-        self.df = df_loc_by_list(self.df, 'posting_id', samples)
-        self.images = self.df['image'].values.tolist()
-        self.labels = self.df['label'].values.tolist()  # create 'label' by grouping 'label_group'
+        self.df = df_loc_by_list(self.df, 'filename', samples)
+        self.images = self.df['filename'].values.tolist()
+        self.labels = self.df['category'].values.tolist()  # create 'label' by grouping 'label_group'
         self.labels = [int(i) for i in self.labels]
         assert (len(self.images) == len(self.labels))
 

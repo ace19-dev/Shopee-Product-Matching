@@ -4,11 +4,9 @@ from PIL import Image
 
 import torch
 import torchvision.transforms as transforms
-from torchvision.transforms import TenCrop, FiveCrop, ToTensor, Lambda, Normalize
+from torchvision.transforms import Normalize
 
 import albumentations as A
-from albumentations import ImageOnlyTransform
-# from albumentations import SmallestMaxSize, HorizontalFlip, Normalize, Compose, RandomCrop
 from albumentations.pytorch import ToTensorV2
 from training.auto_augment import AutoAugment, Cutout
 
@@ -23,8 +21,8 @@ normalize = Normalize(mean=[0.485, 0.456, 0.406],
 # normalize = Normalize(mean=[0.5, 0.5, 0.5],
 #                       std=[0.5, 0.5, 0.5])
 
-CROP_HEIGHT = 380  # 380
-CROP_WIDTH = 380
+CROP_HEIGHT = 512  # 380
+CROP_WIDTH = 512
 
 _, rand_augment, _ = transforms_imagenet_train((CROP_HEIGHT, CROP_WIDTH),
                                                auto_augment='original-mstd0.5',
@@ -77,24 +75,6 @@ class Cutout(object):
         return transforms.ToPILImage()(img.squeeze_(0))
 
 
-class VisionTransform(ImageOnlyTransform):
-    def __init__(
-            self, transform, is_tensor=True, always_apply=False, p=1.0
-    ):
-        super(VisionTransform, self).__init__(always_apply, p)
-        self.transform = transform
-        self.is_tensor = is_tensor
-
-    def apply(self, image, **params):
-        if self.is_tensor:
-            return self.transform(image)
-        else:
-            return np.array(self.transform(Image.fromarray(image)))
-
-    def get_transform_init_args_names(self):
-        return ("transform")
-
-
 def training_augmentation3():
     # train_transform = [
     #     # transforms.Resize((CROP_HEIGHT, CROP_WIDTH)),
@@ -131,10 +111,10 @@ def training_augmentation3():
         # ], p=0.3),
         # A.Blur(blur_limit=3, p=0.3),
         # A.RandomGamma(p=0.5),
-        A.RandomBrightnessContrast(brightness_limit=0.2, p=0.5),
-        A.HueSaturationValue(p=0.5),
-        A.ShiftScaleRotate(p=0.5),
-        A.CoarseDropout(max_holes=4, p=0.5),
+        # A.RandomBrightnessContrast(brightness_limit=0.2, p=0.3),
+        # # A.HueSaturationValue(p=0.5),
+        # A.ShiftScaleRotate(p=0.3),
+        # A.CoarseDropout(max_holes=4, p=0.2),
         A.Normalize(),
         ToTensorV2(),
     ]
@@ -221,7 +201,7 @@ def verify_augmentation():
         ], p=0.3),
         A.HueSaturationValue(p=0.2),
         # A.RandomCrop(CROP_HEIGHT, CROP_WIDTH),
-        VisionTransform(rand_augment, is_tensor=False, p=0.5),
+        # VisionTransform(rand_augment, is_tensor=False, p=0.5),
         A.Normalize(),
         ToTensorV2(),
     ]

@@ -99,7 +99,6 @@ class CosineSoftmaxModule(nn.Module):
 
         in_channels = features_dim  # BertModel: 768
 
-        # self.fc_scale = 12 * 12  # effinet-b4
         self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
         self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
         self.fc = nn.Linear(in_channels, in_channels)
@@ -108,8 +107,6 @@ class CosineSoftmaxModule(nn.Module):
         # # self.bn2 = nn.BatchNorm2d(in_channels, eps=1e-05)
         # self.features = nn.BatchNorm1d(in_channels, eps=1e-05)
         # self.flatten = Flatten()
-        # nn.init.constant_(self.features.weight, 1.0)
-        # self.features.weight.requires_grad = False
 
         # # for arcface
         # self.in_features = self.pretrained.classifier.in_features
@@ -122,13 +119,12 @@ class CosineSoftmaxModule(nn.Module):
         # # self.fc1 = nn.Linear(self.in_features, in_channels)
         # self.bn2 = nn.BatchNorm1d(in_channels)
 
-    # pooler_output
     def forward(self, x):
         ##################
         # COSINE-SOFTMAX
         ##################
         # x = x.view(-1, num_flat_features(x))
-        x = self.dropout(x)
+        # x = self.dropout(x)
         x = self.fc(x)
 
         features = x

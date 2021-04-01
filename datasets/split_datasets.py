@@ -48,7 +48,7 @@ def split_train_val(logger):
     train_df = pd.read_csv(os.path.join(args.source, 'train.csv'))
     logger.info('total: {}'.format(len(train_df)))
     logger.info('train shape: {}\n'.format(train_df.shape))
-    # # delete old unusual
+    # # delete unusual
     # train_df = train_df.loc[~train_df.filename.isin(
     #     ["64faf0b221af4767ba8c167b228fde00.jpg", "d946ee19ac1d2997bac5f18ce75656cb.jpg"])].reset_index(drop=True)
 
@@ -86,6 +86,7 @@ def split_train_val(logger):
 
     # https://www.kaggle.com/c/siim-isic-melanoma-classification/discussion/175614
     # sklearn.model_selection.KFold(n_splits=5, shuffle=True, random_seed=42)
+    # TODO: how about image phash for y??
     gkf = GroupKFold(n_splits=5)
     x_shuffled, y_shuffled, groups_shuffled = \
         shuffle(train_df, train_df['label'], train_df['posting_id'].tolist(), random_state=8)
@@ -141,8 +142,9 @@ def split_train_val(logger):
 #     skf = StratifiedKFold(n_splits=4, shuffle=True)
 #     for train_index, test_index in skf.split(X, y):
 #         print("%s %s" % (train_index, test_index))
-#
-#
+
+
+# # train/test 로 나눠질 때, 그룹에 속한 원소가 쪼개지지 않는다.
 # def test_groupkfold():
 #     X = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 #     y = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32]
@@ -169,6 +171,7 @@ def main(args):
 
     # https://www.kaggle.com/vishnurapps/undersanding-kfold-stratifiedkfold-and-groupkfold
     # test_groupkfold()
+    # test_groupkfold()
 
     # reference on https://www.kaggle.com/reighns/groupkfold-efficientbnet
     # create_labels()
@@ -182,10 +185,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--source',
                         type=str,
-                        default='/home/ace19/dl_data/shopee-product-matching',
+                        default='/home/ace19/dl_data/shopee-product-matching-0',
                         help='Where is train image to load')
     parser.add_argument('--target', type=str,
-                        default='/home/ace19/dl_data/shopee-product-matching/fold',
+                        default='/home/ace19/dl_data/shopee-product-matching-0/fold',
                         help='directory to save splited dataset')
 
     args = parser.parse_args()

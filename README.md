@@ -27,8 +27,8 @@ Kaggle Competition: Determine if two products are the same by their images
   - ViT (??)
 - 기존 대회 데이터로 pretrained model 획득.
   - https://www.kaggle.com/c/shopee-product-matching/discussion/227671
-- ArcFace 적용.
-- find other model through some paper
+- ArcFace 적용 예정.
+- find other model through paper
   - use ocr
 
 - 

@@ -10,7 +10,7 @@ class Options():
                             default='tb_log',
                             help='log directory name')
         parser.add_argument('--dataset-root', type=str,
-                            default='/home/ace19/dl_data/shopee-product-matching',
+                            default='/home/ace19/dl_data/shopee-product-matching-0',
                             help='root')
         parser.add_argument('--output', type=str,
                             default='experiments',
@@ -18,16 +18,16 @@ class Options():
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
         # model params
-        parser.add_argument('--model', type=str, default='seresnext50_32x4d',
+        parser.add_argument('--model', type=str, default='tf_efficientnet_b2_ns',
                             help='network model type (default: tf_efficientnet_b4_ns)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
         # parser.add_argument('--widen', type=int, default=4, metavar='N',
         #     help='widen factor of the network (default: 4)')
         # training hyper params
-        parser.add_argument('--batch-size', type=int, default=64,
+        parser.add_argument('--batch-size', type=int, default=32,
                             metavar='N', help='batch size for training (default: 128)')
-        parser.add_argument('--test-batch-size', type=int, default=64,
+        parser.add_argument('--test-batch-size', type=int, default=32,
                             metavar='N', help='batch size for testing (default: 256)')
         parser.add_argument('--epochs', type=int, default=30, metavar='N',
                             help='number of epochs to train (default: 600)')
@@ -36,7 +36,7 @@ class Options():
         parser.add_argument('--workers', type=int, default=4,
                             metavar='N', help='dataloader threads')
         # lr: tf_efficientnet_b4_ns w/ cosine-softmax: 0.001
-        parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
+        parser.add_argument('--lr', type=float, default=0.0005, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
@@ -59,8 +59,8 @@ class Options():
                             default=None,
                             # default='pre-trained/noisy-student-efficientnet-b2.pth',
                             # 'efficientnet-b7_ns_aa-original-mstd0.5_re_100k_v4_cad79a/snapshot_100000.fp16.pth',
-                            # default='experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/'
-                            #         '(2021-03-17_21:10:32)product_fold3_380x380_tf_efficientnet_b4_ns_acc(54.97810)_loss(0.26047)_checkpoint30.pth.tar',
+                            # default='experiments/shopee-product-matching/tf_efficientnet_b4_ns/'
+                            #         '(2021-03-31_15:02:14)product_fold0_380x380_tf_efficientnet_b4_ns_acc(16.29956)_loss(7.23228)_checkpoint30.pth.tar',
                             help='put the path to resuming file if needed')
         parser.add_argument('--checkpoint_name', type=str, default='product',
                             help='set the checkpoint name')
@@ -79,15 +79,15 @@ class Options():
         # parser.add_argument('--output-path', type=str,
         #                     default='/home/ace19/dl_data/deepfake-detection-challenge/face_datasets/grad-cam',
         #                     help='Input image path')
-        parser.add_argument('--beta', default=0.9, type=float,
+        parser.add_argument('--beta', default=0.8, type=float,
                             help='hyperparameter beta')
         # parser.add_argument('--cutmix_prob', default=0.5, type=float,
         #                     help='cutmix probability')
-        parser.add_argument('--cutmix_prob', default=0.7, type=float,
+        parser.add_argument('--cutmix_prob', default=0.5, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')
-        parser.add_argument('--mixup_prob', default=0.2, type=float,
+        parser.add_argument('--mixup_prob', default=0.0, type=float,
                             help='mixup probability')
         self.parser = parser
 

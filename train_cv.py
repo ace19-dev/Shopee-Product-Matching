@@ -128,7 +128,7 @@ def main():
 
     npz_files = os.listdir(os.path.join(args.dataset_root, 'fold'))
     npz_files.sort()
-    npz_files = npz_files[1:]
+    npz_files = [f for f in npz_files if f[-3:] != 'log']
     num = int(len(npz_files) / 2)
     train_npzs = npz_files[:num]
     val_npzs = npz_files[num:]
@@ -389,7 +389,7 @@ def main():
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
         criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=NUM_CLASS, smoothing=0.1)
+                                           num_cls=NUM_CLASS, smoothing=0.0)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
         # criterion = FocalLoss()
@@ -417,7 +417,7 @@ def main():
         #     torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 5, args.epochs)
         scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
                                  len(train_loader) // args.batch_size,
-                                 args.lr_step, warmup_epochs=5)
+                                 args.lr_step, warmup_epochs=4)
         # scheduler = \
         #     torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
         logger.info(scheduler.__str__())
