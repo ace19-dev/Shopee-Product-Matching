@@ -24,6 +24,7 @@ from datasets.product import ProductDataset, NUM_CLASS
 from datasets.sampler import ImbalancedDatasetSampler
 from option import Options
 from training.lr_scheduler import LR_Scheduler
+from training.losses import FocalLoss
 from training.taylor_cross_entropy_loss import TaylorCrossEntropyLoss
 from utils.training_helper import *
 from utils.image_helper import *
@@ -159,7 +160,6 @@ def main():
             # CutMix (from https://github.com/clovaai/CutMix-PyTorch)
             r = np.random.rand(1)
             if args.beta > 0 and r < args.cutmix_prob:
-                # print('in cutmix')
                 # generate mixed sample
                 lam = np.random.beta(args.beta, args.beta)
                 rand_index = torch.randperm(images.size()[0]).cuda()
@@ -170,8 +170,8 @@ def main():
                 # adjust lambda to exactly match pixel ratio
                 lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
 
-                # outputs = model(images, targets)  # arcface
-                _, outputs = model(images)    # cosine-softmax
+                outputs = model(images, targets)  # arcface
+                # _, outputs = model(images)  # cosine-softmax
 
                 # loss = criterion(activations=outputs,
                 #                  labels=torch.nn.functional.one_hot(target_a),
@@ -188,8 +188,8 @@ def main():
                     # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
                     inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
                     inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    # outputs = model(images, targets)  # arcface
-                    _, outputs = model(images)    # cosine-softmax
+                    outputs = model(images, targets)  # arcface
+                    # _, outputs = model(images)  # cosine-softmax
                     loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
                     # train_loss += loss.data[0]
                     # _, preds = torch.max(outputs.data, 1)
@@ -198,8 +198,8 @@ def main():
                     #             + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float())
                 else:
                     MIXUP_FLAG = False
-                    # outputs = model(images, targets)  # arcface
-                    _, outputs = model(images)    # cosine-softmax
+                    outputs = model(images, targets)  # arcface
+                    # _, outputs = model(images)  # cosine-softmax
                     # print('outputs:', outputs.shape)
                     # print('targets:', targets.shape)
 
@@ -257,8 +257,8 @@ def main():
                 images, targets = images.cuda(), targets.cuda()
 
             with torch.no_grad():
-                # outputs = model(images, targets)  # arcface
-                _, outputs = model(images)  # cosine-softmax
+                outputs = model(images, targets)  # arcface
+                # _, outputs = model(images)  # cosine-softmax
 
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
@@ -388,11 +388,11 @@ def main():
         # https://github.com/fhopfmueller/bi-tempered-loss-pytorch
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
-        criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=NUM_CLASS, smoothing=0.0)
+        # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
+        #                                    num_cls=NUM_CLASS, smoothing=0.0)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        # criterion = FocalLoss()
+        criterion = FocalLoss()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         logger.info('\n-------------- loss details --------------')
@@ -445,15 +445,16 @@ def main():
                 best_pred = checkpoint['best_pred']
                 acc_lst_train = checkpoint['acc_lst_train']
                 acc_lst_val = checkpoint['acc_lst_val']
-                # lst = ['module.pretrained.fc.weight', 'module.pretrained.fc.bias', 'module.head.1.weight',
-                #        'module.head.1.bias', 'module.head2.2.weight', 'module.head2.2.bias']
-                # pretrained_dict = checkpoint['state_dict']
-                # new_model_dict = model.state_dict()
-                # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in lst}
-                # new_model_dict.update(pretrained_dict)
-                # model.load_state_dict(new_model_dict, strict=False)
+                not_to_be_applied = ['module.pretrained.classifier.weight',
+                                     'module.pretrained.classifier.bias',
+                                     'module.cosine_softmax.weights']
+                pretrained_dict = checkpoint['state_dict']
+                new_model_dict = model.state_dict()
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in not_to_be_applied}
+                new_model_dict.update(pretrained_dict)
+                model.load_state_dict(new_model_dict, strict=False)
 
-                model.load_state_dict(checkpoint['state_dict'], strict=False)
+                # model.load_state_dict(checkpoint['state_dict'], strict=False)
 
                 # https://github.com/pytorch/pytorch/issues/2830
                 if 'optimizer' in checkpoint:

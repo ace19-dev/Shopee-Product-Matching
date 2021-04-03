@@ -111,7 +111,7 @@ class CosineSoftmaxModule(nn.Module):
         # self.flatten = Flatten()
         # nn.init.constant_(self.features.weight, 1.0)
         # self.features.weight.requires_grad = False
-        self.classifier = nn.Linear(in_features=768, out_features=self.nclass, bias=True)
+        # self.classifier = nn.Linear(in_features=768, out_features=self.nclass, bias=True)
 
     # pooler_output
     def forward(self, x):
@@ -140,46 +140,45 @@ class Model(nn.Module):
         self.nclass = nclass
 
         # TODO: use various model
-        # self.pretrained = BertForSequenceClassification.from_pretrained("bert-base-multilingual-cased",
+        # self.pretrained = BertForSequenceClassification.from_pretrained("bert-base-multilingual-uncased",
         #                                                       num_labels=nclass)
-        config = BertConfig.from_pretrained('bert-base-multilingual-cased')
+        config = BertConfig.from_pretrained('bert-base-multilingual-uncased')
         self.pretrained = BertModel(config)
         # print(self.pretrained)
 
         in_channels = 768  # BertModel
-        self.cosine_softmax = CosineSoftmaxModule(in_channels, nclass)
+        # self.cosine_softmax = CosineSoftmaxModule(in_channels, nclass)
 
         # for arcface
-        # self.in_features = self.pretrained.classifier.in_features
         self.margin = ArcModule(in_features=in_channels, out_features=nclass)
-        # self.bn1 = nn.BatchNorm2d(self.in_features)
-        self.dropout = nn.Dropout2d(0.2, inplace=True)
-        # self.dropout = nn.Dropout(p=0.4, inplace=True)
-        # self.fc1 = nn.Linear(self.in_features * 12 * 12, in_channels)
-        self.bn2 = nn.BatchNorm1d(in_channels)
+        self.bn1 = nn.BatchNorm2d(self.in_channels)
+        self.dropout = nn.Dropout2d(0.4, inplace=True)
+        # self.fc1 = nn.Linear(self.in_channels * 16 * 16, self.in_channels)    # original
+        self.fc1 = nn.Linear(self.in_channels, self.in_channels)
+        self.bn2 = nn.BatchNorm1d(self.in_channels)
 
-    # cosine-softmax
-    def forward(self, input_ids, input_mask):
-        if self.backbone.startswith('Bert'):
-            outputs = self.pretrained(input_ids=input_ids,
-                                      attention_mask=input_mask, )
-
-        return self.cosine_softmax(outputs['pooler_output'])
-
-    # # ArcFace
-    # # https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
-    # def forward(self, input_ids, input_mask, labels):
-    #     if self.backbone.startswith('Bert'):
+    # # cosine-softmax
+    # def forward(self, input_ids, input_mask):
+    #     if self.backbone.startswith('bert'):
     #         outputs = self.pretrained(input_ids=input_ids,
     #                                   attention_mask=input_mask, )
     #
-    #     # features = self.bn1(x)
-    #     # features = self.dropout(features)
-    #     # features = features.view(features.size(0), -1)
-    #     # features = self.fc1(features)
-    #     features = self.bn2(outputs['pooler_output'])
-    #     features = F.normalize(features)
-    #     if labels is not None:
-    #         return self.margin(features, labels)
-    #
-    #     return features
+    #         # return self.cosine_softmax(outputs['pooler_output'])
+
+    # ArcFace
+    # https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
+    def forward(self, input_ids, input_mask, labels):
+        if self.backbone.startswith('bert'):
+            outputs = self.pretrained(input_ids=input_ids,
+                                      attention_mask=input_mask, )
+
+        # features = self.bn1(x)
+        # features = self.dropout(features)
+        # features = features.view(features.size(0), -1)
+        # features = self.fc1(features)
+        # features = self.bn2(features)
+        features = F.normalize(outputs['pooler_output'], eps=1e-8)
+        if labels is not None:
+            return self.margin(features, labels)
+
+        return features

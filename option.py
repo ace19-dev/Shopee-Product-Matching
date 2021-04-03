@@ -10,7 +10,7 @@ class Options():
                             default='tb_log',
                             help='log directory name')
         parser.add_argument('--dataset-root', type=str,
-                            default='/home/ace19/dl_data/shopee-product-matching-0',
+                            default='/home/ace19/dl_data/shopee-product-matching',
                             help='root')
         parser.add_argument('--output', type=str,
                             default='experiments',
@@ -36,7 +36,7 @@ class Options():
         parser.add_argument('--workers', type=int, default=4,
                             metavar='N', help='dataloader threads')
         # lr: tf_efficientnet_b4_ns w/ cosine-softmax: 0.001
-        parser.add_argument('--lr', type=float, default=0.0005, metavar='LR',
+        parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
@@ -59,8 +59,8 @@ class Options():
                             default=None,
                             # default='pre-trained/noisy-student-efficientnet-b2.pth',
                             # 'efficientnet-b7_ns_aa-original-mstd0.5_re_100k_v4_cad79a/snapshot_100000.fp16.pth',
-                            # default='experiments/shopee-product-matching/tf_efficientnet_b4_ns/'
-                            #         '(2021-03-31_15:02:14)product_fold0_380x380_tf_efficientnet_b4_ns_acc(16.29956)_loss(7.23228)_checkpoint30.pth.tar',
+                            # default='experiments/shopee-product-matching/tf_efficientnet_b2_ns_1/'
+                            #         '(2021-03-31_21:37:05)product_fold1_512x512_tf_efficientnet_b2_ns_acc(18.97635)_loss(8.0072)_checkpoint30.pth.tar',
                             help='put the path to resuming file if needed')
         parser.add_argument('--checkpoint_name', type=str, default='product',
                             help='set the checkpoint name')

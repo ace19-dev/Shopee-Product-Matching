@@ -103,11 +103,11 @@ def main():
 
             local_step += 1
 
-            # # ArcFace
-            # outputs = model(input_ids, input_mask, labels)
+            # ArcFace
+            outputs = model(input_ids, input_mask, labels)
             # cosine-softmax
-            # https://huggingface.co/transformers/model_doc/bert.html
-            _, outputs = model(input_ids, input_mask)
+            # # https://huggingface.co/transformers/model_doc/bert.html
+            # _, outputs = model(input_ids, input_mask)
             # print('outputs:', outputs.shape)
             # print('labels:', labels.shape)
             # print('outputs:', outputs)
@@ -163,10 +163,10 @@ def main():
                     input_ids.cuda(), input_mask.cuda(), labels.cuda()
 
             with torch.no_grad():
-                # # ArcFace
-                # outputs = model(input_ids, input_mask, labels)
-                # cosine-softmax
-                _, outputs = model(input_ids, input_mask)
+                # ArcFace
+                outputs = model(input_ids, input_mask, labels)
+                # # cosine-softmax
+                # _, outputs = model(input_ids, input_mask)
 
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
@@ -267,7 +267,7 @@ def main():
 
         # config = BertConfig.from_pretrained('bert-base-multilingual-cased')
         # model = BertModel(config)
-        model = M.Model(backbone='Bert', nclass=NUM_CLASS)
+        model = M.Model(backbone=args.model, nclass=NUM_CLASS)
         logger.info('\n-------------- model details --------------')
         logger.info(model)
 
@@ -281,11 +281,11 @@ def main():
         # https://github.com/fhopfmueller/bi-tempered-loss-pytorch
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
-        criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=NUM_CLASS, smoothing=0.1)
+        # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
+        #                                    num_cls=NUM_CLASS, smoothing=0.0)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        # criterion = FocalLoss()
+        criterion = FocalLoss()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         # logger.info('\n-------------- loss details --------------')
@@ -309,7 +309,7 @@ def main():
         #     torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 5, args.epochs)
         scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
                                  len(train_loader) // args.batch_size,
-                                 args.lr_step, warmup_epochs=3)
+                                 args.lr_step, warmup_epochs=4)
         total_steps = len(train_loader) * args.epochs
         # scheduler = get_linear_schedule_with_warmup(optimizer,
         #                                             num_warmup_steps=(total_steps/args.epochs)*3,

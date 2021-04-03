@@ -168,40 +168,37 @@ class Model(nn.Module):
         # del pre_model['fc.bias']
         # self.pretrained.load_state_dict(pre_model, strict=False)
 
-        in_channels = 512  # resnet18, resnet34
+        self.in_channels = 512  # resnet18, resnet34
         if self.backbone in ['resnet18', 'resnet34', 'vgg16', 'vgg19']:
-            in_channels = 512
+            self.in_channels = 512
         elif self.backbone in ['seresnext50_32x4d', 'resnext101_32x8d', 'resnext50_32x4d',
                                'resnest50d', 'resnest101e', 'resnest200e', 'resnet50',
                                'resnest269e', 'resnet101', 'resnet152', 'resnest50d_4s2x40d']:
-            in_channels = 2048
+            self.in_channels = 2048
         elif self.backbone.startswith('tf_efficientnet_b0'):
-            in_channels = 1280
+            self.in_channels = 1280
         elif self.backbone.startswith('tf_efficientnet_b1'):
-            in_channels = 1280
+            self.in_channels = 1280
         elif self.backbone.startswith('tf_efficientnet_b2'):
-            in_channels = 1408
+            self.in_channels = 1408
         elif self.backbone.startswith('tf_efficientnet_b3'):
-            in_channels = 1536
+            self.in_channels = 1536
         elif self.backbone.startswith('tf_efficientnet_b4'):
-            in_channels = 1792
+            self.in_channels = 1792
         elif self.backbone.startswith('tf_efficientnet_b5'):
-            in_channels = 2048
+            self.in_channels = 2048
 
-        self.cosine_softmax = CosineSoftmaxModule(in_channels, nclass)
+        # self.cosine_softmax = CosineSoftmaxModule(self.in_channels, nclass)
 
-        # # TODO: make arcface func.
-        # self.in_features = self.pretrained.classifier.in_features
-        # self.margin = ArcModule(in_features=in_channels, out_features=nclass)
-        # self.bn1 = nn.BatchNorm2d(self.in_features)
-        # # self.bn1 = nn.BatchNorm1d(in_channels, eps=1e-05)
-        # self.dropout = nn.Dropout2d(0.2, inplace=True)
-        # # self.dropout = nn.Dropout(p=0.4, inplace=True)
-        # self.fc1 = nn.Linear(self.in_features * 12 * 12, in_channels)
-        # # self.fc1 = nn.Linear(self.in_features, in_channels)
-        # self.bn2 = nn.BatchNorm1d(in_channels)
+        # TODO: make arcface func.
+        self.margin = ArcModule(in_features=self.in_channels, out_features=nclass)
+        self.bn1 = nn.BatchNorm2d(self.in_channels)
+        self.dropout = nn.Dropout2d(0.4, inplace=True)
+        # self.fc1 = nn.Linear(self.in_channels * 16 * 16, self.in_channels)    # original
+        self.fc1 = nn.Linear(self.in_channels, self.in_channels)
+        self.bn2 = nn.BatchNorm1d(self.in_channels)
 
-    def forward(self, x):
+    def forward(self, x, labels):
         if self.backbone.startswith('tf_efficientnet'):
             x = self.pretrained.conv_stem(x)
             x = self.pretrained.bn1(x)
@@ -227,19 +224,19 @@ class Model(nn.Module):
             x = self.pretrained.layer4(x)
             x = self.pretrained.global_pool(x)
 
-        return self.cosine_softmax(x)
+        # return self.cosine_softmax(x)
 
-        # ##################
-        # # ArcFace -
-        # #   https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
-        # ##################
+        ##################
+        # ArcFace -
+        #   https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
+        ##################
         # features = self.bn1(x)
         # features = self.dropout(features)
         # features = features.view(features.size(0), -1)
-        # features = self.fc1(features)
+        features = self.fc1(x)
         # features = self.bn2(features)
-        # features = F.normalize(features)
-        # if labels is not None:
-        #     return self.margin(features, labels)
-        #
-        # return features
+        features = F.normalize(features, eps=1e-8)
+        if labels is not None:
+            return self.margin(features, labels)
+
+        return features

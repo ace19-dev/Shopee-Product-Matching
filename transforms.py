@@ -111,10 +111,10 @@ def training_augmentation3():
         # ], p=0.3),
         # A.Blur(blur_limit=3, p=0.3),
         # A.RandomGamma(p=0.5),
-        # A.RandomBrightnessContrast(brightness_limit=0.2, p=0.3),
+        # A.RandomBrightnessContrast(p=0.1),
         # # A.HueSaturationValue(p=0.5),
-        # A.ShiftScaleRotate(p=0.3),
-        # A.CoarseDropout(max_holes=4, p=0.2),
+        A.ShiftScaleRotate(p=0.3),
+        # A.CoarseDropout(max_holes=3, p=0.3),
         A.Normalize(),
         ToTensorV2(),
     ]

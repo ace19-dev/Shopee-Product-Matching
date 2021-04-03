@@ -8,10 +8,9 @@ import numpy as np
 import torch
 import torch.utils.data as data
 
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+# from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-# NUM_CLASS = 11014
-NUM_CLASS = 42
+NUM_CLASS = 11014
 MAX_LEN = 512  # TODO: check title max
 
 
@@ -29,15 +28,23 @@ class ProductTextDataset(data.Dataset):
 
         self.posting_id = self.df['posting_id'].values.tolist()
 
+        self.input_ids = []
         # https://skimai.com/fine-tuning-bert-for-sentiment-analysis/
         sentences = self.df['title']
         # BERT 입력 형식에 맞게 변환
-        sentences = ["[CLS] " + str(s) + " [SEP]" for s in sentences]
-        tokenized_texts = [tokenizer.tokenize(s) for s in sentences]
-        # 토큰을 숫자 인덱스로 변환
-        self.input_ids = [tokenizer.convert_tokens_to_ids(x) for x in tokenized_texts]
-        # 문장을 MAX_LEN 길이에 맞게 자르고, 모자란 부분을 패딩 0으로 채움
-        self.input_ids = pad_sequences(self.input_ids, maxlen=MAX_LEN, dtype="long", truncating="post", padding="post")
+        for sent in sentences:
+            input_sequence = "[CLS] " + str(sent) + " [SEP]"
+            tokenized_texts = tokenizer.tokenize(input_sequence)
+            tokens = tokenizer.convert_tokens_to_ids(tokenized_texts)
+            tokens += [0] * (MAX_LEN - len(tokens))
+            self.input_ids.append(tokens)
+
+        # sentences = ["[CLS] " + str(s) + " [SEP]" for s in sentences]
+        # tokenized_texts = [tokenizer.tokenize(s) for s in sentences]
+        # # 토큰을 숫자 인덱스로 변환
+        # self.input_ids = [tokenizer.convert_tokens_to_ids(x) for x in tokenized_texts]
+        # # 문장을 MAX_LEN 길이에 맞게 자르고, 모자란 부분을 패딩 0으로 채움
+        # self.input_ids = pad_sequences(self.input_ids, maxlen=MAX_LEN, dtype="long", truncating="post", padding="post")
 
         self.labels = self.df['label'].values.tolist()  # create 'label' by grouping 'label_group'
         self.labels = [int(i) for i in self.labels]
@@ -83,12 +90,19 @@ class ProductTextTestDataset(data.Dataset):
 
         sentences = self.df['title']
         # BERT 입력 형식에 맞게 변환
-        sentences = ["[CLS] " + str(s) + " [SEP]" for s in sentences]
-        tokenized_texts = [tokenizer.tokenize(s) for s in sentences]
-        # 토큰을 숫자 인덱스로 변환
-        self.input_ids = [tokenizer.convert_tokens_to_ids(x) for x in tokenized_texts]
-        # 문장을 MAX_LEN 길이에 맞게 자르고, 모자란 부분을 패딩 0으로 채움
-        self.input_ids = pad_sequences(self.input_ids, maxlen=MAX_LEN, dtype="long", truncating="post", padding="post")
+        for sent in sentences:
+            input_sequence = "[CLS] " + str(sent) + " [SEP]"
+            tokenized_texts = tokenizer.tokenize(input_sequence)
+            tokens = tokenizer.convert_tokens_to_ids(tokenized_texts)
+            tokens += [0] * (MAX_LEN - len(tokens))
+            self.input_ids.append(tokens)
+
+        # sentences = ["[CLS] " + str(s) + " [SEP]" for s in sentences]
+        # tokenized_texts = [tokenizer.tokenize(s) for s in sentences]
+        # # 토큰을 숫자 인덱스로 변환
+        # self.input_ids = [tokenizer.convert_tokens_to_ids(x) for x in tokenized_texts]
+        # # 문장을 MAX_LEN 길이에 맞게 자르고, 모자란 부분을 패딩 0으로 채움
+        # self.input_ids = pad_sequences(self.input_ids, maxlen=MAX_LEN, dtype="long", truncating="post", padding="post")
 
         self.attention_masks = []
         # 어텐션 마스크를 패딩이 아니면 1, 패딩이면 0으로 설정
@@ -115,9 +129,9 @@ class ProductDataset(data.Dataset):
 
         samples = list(np.concatenate([np.load(data_dir + '/fold/%s' % f, allow_pickle=True) for f in self.fold]))
         self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
-        self.df = df_loc_by_list(self.df, 'filename', samples)
-        self.images = self.df['filename'].values.tolist()
-        self.labels = self.df['category'].values.tolist()  # create 'label' by grouping 'label_group'
+        self.df = df_loc_by_list(self.df, 'posting_id', samples)
+        self.images = self.df['image'].values.tolist()
+        self.labels = self.df['label'].values.tolist()  # create 'label' by grouping 'label_group'
         self.labels = [int(i) for i in self.labels]
         assert (len(self.images) == len(self.labels))
 
