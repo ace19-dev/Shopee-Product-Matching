@@ -388,11 +388,11 @@ def main():
         # https://github.com/fhopfmueller/bi-tempered-loss-pytorch
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
-        # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-        #                                    num_cls=NUM_CLASS, smoothing=0.0)
+        criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
+                                           num_cls=NUM_CLASS, smoothing=0.0)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        criterion = FocalLoss()
+        # criterion = FocalLoss()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         logger.info('\n-------------- loss details --------------')

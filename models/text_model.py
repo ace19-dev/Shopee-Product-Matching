@@ -111,7 +111,6 @@ class CosineSoftmaxModule(nn.Module):
         # self.flatten = Flatten()
         # nn.init.constant_(self.features.weight, 1.0)
         # self.features.weight.requires_grad = False
-        # self.classifier = nn.Linear(in_features=768, out_features=self.nclass, bias=True)
 
     # pooler_output
     def forward(self, x):
@@ -137,7 +136,7 @@ class Model(nn.Module):
     def __init__(self, backbone, nclass=11014):
         super(Model, self).__init__()
         self.backbone = backbone
-        self.nclass = nclass
+        # self.nclass = nclass
 
         # TODO: use various model
         # self.pretrained = BertForSequenceClassification.from_pretrained("bert-base-multilingual-uncased",
@@ -146,13 +145,13 @@ class Model(nn.Module):
         self.pretrained = BertModel(config)
         # print(self.pretrained)
 
-        in_channels = 768  # BertModel
+        self.in_channels = 768  # BertModel
         # self.cosine_softmax = CosineSoftmaxModule(in_channels, nclass)
 
-        # for arcface
-        self.margin = ArcModule(in_features=in_channels, out_features=nclass)
-        self.bn1 = nn.BatchNorm2d(self.in_channels)
-        self.dropout = nn.Dropout2d(0.4, inplace=True)
+        # ArcFace
+        self.margin = ArcModule(in_features=self.in_channels, out_features=nclass)
+        # self.bn1 = nn.BatchNorm2d(self.in_channels)
+        # self.dropout = nn.Dropout2d(0.4, inplace=True)
         # self.fc1 = nn.Linear(self.in_channels * 16 * 16, self.in_channels)    # original
         self.fc1 = nn.Linear(self.in_channels, self.in_channels)
         self.bn2 = nn.BatchNorm1d(self.in_channels)
@@ -175,9 +174,9 @@ class Model(nn.Module):
         # features = self.bn1(x)
         # features = self.dropout(features)
         # features = features.view(features.size(0), -1)
-        # features = self.fc1(features)
-        # features = self.bn2(features)
-        features = F.normalize(outputs['pooler_output'], eps=1e-8)
+        features = self.fc1(outputs['pooler_output'])
+        features = self.bn2(features)
+        features = F.normalize(features, eps=1e-8)
         if labels is not None:
             return self.margin(features, labels)
 

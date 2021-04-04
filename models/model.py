@@ -192,8 +192,8 @@ class Model(nn.Module):
 
         # TODO: make arcface func.
         self.margin = ArcModule(in_features=self.in_channels, out_features=nclass)
-        self.bn1 = nn.BatchNorm2d(self.in_channels)
-        self.dropout = nn.Dropout2d(0.4, inplace=True)
+        # self.bn1 = nn.BatchNorm2d(self.in_channels)
+        # self.dropout = nn.Dropout2d(0.4, inplace=True)
         # self.fc1 = nn.Linear(self.in_channels * 16 * 16, self.in_channels)    # original
         self.fc1 = nn.Linear(self.in_channels, self.in_channels)
         self.bn2 = nn.BatchNorm1d(self.in_channels)
@@ -234,7 +234,7 @@ class Model(nn.Module):
         # features = self.dropout(features)
         # features = features.view(features.size(0), -1)
         features = self.fc1(x)
-        # features = self.bn2(features)
+        features = self.bn2(features)
         features = F.normalize(features, eps=1e-8)
         if labels is not None:
             return self.margin(features, labels)

@@ -35,8 +35,10 @@ class Options():
                             metavar='N', help='the epoch number to start (default: 1)')
         parser.add_argument('--workers', type=int, default=4,
                             metavar='N', help='dataloader threads')
-        # lr: tf_efficientnet_b4_ns w/ cosine-softmax: 0.001
-        parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
+        # lr:
+        # tf_efficientnet_b2_ns w/ cosine-softmax: 0.001
+        # tf_efficientnet_b2_ns w/ ArcFace: 0.0001
+        parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
