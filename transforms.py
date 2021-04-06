@@ -21,8 +21,12 @@ normalize = Normalize(mean=[0.485, 0.456, 0.406],
 # normalize = Normalize(mean=[0.5, 0.5, 0.5],
 #                       std=[0.5, 0.5, 0.5])
 
-CROP_HEIGHT = 512  # 380
-CROP_WIDTH = 512
+CROP_HEIGHT = 192  # 380
+CROP_WIDTH = 192
+
+# https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/nfnet.py
+TEST_CROP_HEIGHT = 256  # 380
+TEST_CROP_WIDTH = 256
 
 _, rand_augment, _ = transforms_imagenet_train((CROP_HEIGHT, CROP_WIDTH),
                                                auto_augment='original-mstd0.5',
@@ -151,7 +155,7 @@ def validation_augmentation():
     validation_transform = [
         # A.Resize(600, 800),
         # A.CenterCrop(CROP_HEIGHT, CROP_WIDTH),
-        A.Resize(CROP_HEIGHT, CROP_WIDTH),
+        A.Resize(TEST_CROP_HEIGHT, TEST_CROP_WIDTH),
         # A.ShiftScaleRotate(shift_limit=0.0, scale_limit=(0.4, 0.5), p=0.7),
         A.Normalize(),
         # A.Normalize(mean=(0.43, 0.497, 0.313), std=(0.219, 0.224, 0.201)),
@@ -177,32 +181,31 @@ def test_augmentation():
     # return transforms.Compose(test_transform)
 
     test_transform = [
-        A.Resize(CROP_HEIGHT, CROP_WIDTH),
+        A.Resize(TEST_CROP_HEIGHT, TEST_CROP_WIDTH),
         A.Normalize(),
         ToTensorV2(),
     ]
     return A.Compose(test_transform)
 
-
-def verify_augmentation():
-    train_transform = [
-        A.Resize(CROP_HEIGHT, CROP_WIDTH),
-        A.HorizontalFlip(),
-        A.VerticalFlip(p=0.1),
-        A.OneOf([
-            A.MultiplicativeNoise(multiplier=(0.7, 1.2), elementwise=True),
-            A.IAAAdditiveGaussianNoise(),
-            A.GaussNoise(var_limit=100),
-        ], p=0.5),
-        A.OneOf([
-            A.MotionBlur(p=0.3),
-            A.GaussianBlur(p=0.5),
-            A.Blur(blur_limit=3, p=0.3),
-        ], p=0.3),
-        A.HueSaturationValue(p=0.2),
-        # A.RandomCrop(CROP_HEIGHT, CROP_WIDTH),
-        # VisionTransform(rand_augment, is_tensor=False, p=0.5),
-        A.Normalize(),
-        ToTensorV2(),
-    ]
-    return A.Compose(train_transform)
+# def verify_augmentation():
+#     train_transform = [
+#         A.Resize(CROP_HEIGHT, CROP_WIDTH),
+#         A.HorizontalFlip(),
+#         A.VerticalFlip(p=0.1),
+#         A.OneOf([
+#             A.MultiplicativeNoise(multiplier=(0.7, 1.2), elementwise=True),
+#             A.IAAAdditiveGaussianNoise(),
+#             A.GaussNoise(var_limit=100),
+#         ], p=0.5),
+#         A.OneOf([
+#             A.MotionBlur(p=0.3),
+#             A.GaussianBlur(p=0.5),
+#             A.Blur(blur_limit=3, p=0.3),
+#         ], p=0.3),
+#         A.HueSaturationValue(p=0.2),
+#         # A.RandomCrop(CROP_HEIGHT, CROP_WIDTH),
+#         # VisionTransform(rand_augment, is_tensor=False, p=0.5),
+#         A.Normalize(),
+#         ToTensorV2(),
+#     ]
+#     return A.Compose(train_transform)

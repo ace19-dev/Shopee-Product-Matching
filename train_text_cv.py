@@ -105,7 +105,7 @@ def main():
 
             # ArcFace
             outputs = model(input_ids, input_mask, labels)
-            # cosine-softmax
+            # # cosine-softmax
             # # https://huggingface.co/transformers/model_doc/bert.html
             # _, outputs = model(input_ids, input_mask)
             # print('outputs:', outputs.shape)
@@ -283,9 +283,9 @@ def main():
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
         # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
         #                                    num_cls=NUM_CLASS, smoothing=0.0)
-        # criterion = torch.nn.CrossEntropyLoss()
+        criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        criterion = FocalLoss()
+        # criterion = FocalLoss()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         # logger.info('\n-------------- loss details --------------')

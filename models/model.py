@@ -163,7 +163,7 @@ class Model(nn.Module):
         pprint(model_names)
         self.pretrained = timm.create_model(self.backbone, pretrained=True, num_classes=nclass)
         # # Below code is used when if pretrained is False
-        # pre_model = torch.load('/home/ace19/.cache/torch/checkpoints/resnest101-22405ba7.pth')
+        # pre_model = torch.load('/home/ace19/.cache/torch/hub/checkpoints/dm_nfnet_f0-604f9c3a.pth')
         # del pre_model['fc.weight']
         # del pre_model['fc.bias']
         # self.pretrained.load_state_dict(pre_model, strict=False)
@@ -187,18 +187,21 @@ class Model(nn.Module):
             self.in_channels = 1792
         elif self.backbone.startswith('tf_efficientnet_b5'):
             self.in_channels = 2048
+        # https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/nfnet.py
+        elif self.backbone.startswith('dm_nfnet_f'):
+            self.in_channels = 3072
 
-        # self.cosine_softmax = CosineSoftmaxModule(self.in_channels, nclass)
+        self.cosine_softmax = CosineSoftmaxModule(self.in_channels, nclass)
 
-        # TODO: make arcface func.
-        self.margin = ArcModule(in_features=self.in_channels, out_features=nclass)
-        # self.bn1 = nn.BatchNorm2d(self.in_channels)
-        # self.dropout = nn.Dropout2d(0.4, inplace=True)
-        # self.fc1 = nn.Linear(self.in_channels * 16 * 16, self.in_channels)    # original
-        self.fc1 = nn.Linear(self.in_channels, self.in_channels)
-        self.bn2 = nn.BatchNorm1d(self.in_channels)
+        # # TODO: make arcface func.
+        # self.margin = ArcModule(in_features=self.in_channels, out_features=nclass)
+        # # self.bn1 = nn.BatchNorm2d(self.in_channels)
+        # # self.dropout = nn.Dropout2d(0.4, inplace=True)
+        # # self.fc1 = nn.Linear(self.in_channels * 16 * 16, self.in_channels)    # original
+        # self.fc1 = nn.Linear(self.in_channels, self.in_channels)
+        # self.bn2 = nn.BatchNorm1d(self.in_channels)
 
-    def forward(self, x, labels):
+    def forward(self, x):
         if self.backbone.startswith('tf_efficientnet'):
             x = self.pretrained.conv_stem(x)
             x = self.pretrained.bn1(x)
@@ -208,7 +211,6 @@ class Model(nn.Module):
             x = self.pretrained.bn2(x)
             x = self.pretrained.act2(x)
             x = self.pretrained.global_pool(x)
-            # return self.pretrained.classifier(x)
 
         elif self.backbone.startswith('resnet') or \
                 self.backbone.startswith('resnext') or \
@@ -224,19 +226,27 @@ class Model(nn.Module):
             x = self.pretrained.layer4(x)
             x = self.pretrained.global_pool(x)
 
-        # return self.cosine_softmax(x)
+        elif self.backbone.startswith('dm_nfnet'):
+            x = self.pretrained.stem(x)
+            x = self.pretrained.stages(x)
+            x = self.pretrained.final_conv(x)
+            x = self.pretrained.final_act(x)
+            x = self.pretrained.head.global_pool(x)
 
-        ##################
-        # ArcFace -
-        #   https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
-        ##################
-        # features = self.bn1(x)
-        # features = self.dropout(features)
-        # features = features.view(features.size(0), -1)
-        features = self.fc1(x)
-        features = self.bn2(features)
-        features = F.normalize(features, eps=1e-8)
-        if labels is not None:
-            return self.margin(features, labels)
+        return self.cosine_softmax(x)
 
-        return features
+
+        # ##################
+        # # ArcFace -
+        # #   https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
+        # ##################
+        # # features = self.bn1(x)
+        # # features = self.dropout(features)
+        # # features = features.view(features.size(0), -1)
+        # features = self.fc1(x)
+        # features = self.bn2(features)
+        # features = F.normalize(features, eps=1e-8)
+        # if labels is not None:
+        #     return self.margin(features, labels)
+        #
+        # return features

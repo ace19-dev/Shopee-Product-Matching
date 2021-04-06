@@ -18,16 +18,16 @@ class Options():
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
         # model params
-        parser.add_argument('--model', type=str, default='tf_efficientnet_b2_ns',
-                            help='network model type (default: tf_efficientnet_b4_ns)')
+        parser.add_argument('--model', type=str, default='dm_nfnet_f0',
+                            help='network model type (default: tf_efficientnet_b2_ns)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
         # parser.add_argument('--widen', type=int, default=4, metavar='N',
         #     help='widen factor of the network (default: 4)')
         # training hyper params
-        parser.add_argument('--batch-size', type=int, default=32,
+        parser.add_argument('--batch-size', type=int, default=128,
                             metavar='N', help='batch size for training (default: 128)')
-        parser.add_argument('--test-batch-size', type=int, default=32,
+        parser.add_argument('--test-batch-size', type=int, default=128,
                             metavar='N', help='batch size for testing (default: 256)')
         parser.add_argument('--epochs', type=int, default=30, metavar='N',
                             help='number of epochs to train (default: 600)')
@@ -38,7 +38,8 @@ class Options():
         # lr:
         # tf_efficientnet_b2_ns w/ cosine-softmax: 0.001
         # tf_efficientnet_b2_ns w/ ArcFace: 0.0001
-        parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
+        # dm_nfnet_f0 w/ cosine-softmax: 0.0003
+        parser.add_argument('--lr', type=float, default=0.0003, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')

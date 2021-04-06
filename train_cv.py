@@ -170,8 +170,8 @@ def main():
                 # adjust lambda to exactly match pixel ratio
                 lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
 
-                outputs = model(images, targets)  # arcface
-                # _, outputs = model(images)  # cosine-softmax
+                # outputs = model(images, targets)  # arcface
+                _, outputs = model(images)  # cosine-softmax
 
                 # loss = criterion(activations=outputs,
                 #                  labels=torch.nn.functional.one_hot(target_a),
@@ -188,8 +188,8 @@ def main():
                     # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
                     inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
                     inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    outputs = model(images, targets)  # arcface
-                    # _, outputs = model(images)  # cosine-softmax
+                    # outputs = model(images, targets)  # arcface
+                    _, outputs = model(images)  # cosine-softmax
                     loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
                     # train_loss += loss.data[0]
                     # _, preds = torch.max(outputs.data, 1)
@@ -198,8 +198,8 @@ def main():
                     #             + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float())
                 else:
                     MIXUP_FLAG = False
-                    outputs = model(images, targets)  # arcface
-                    # _, outputs = model(images)  # cosine-softmax
+                    # outputs = model(images, targets)  # arcface
+                    _, outputs = model(images)  # cosine-softmax
                     # print('outputs:', outputs.shape)
                     # print('targets:', targets.shape)
 
@@ -220,15 +220,18 @@ def main():
             # https://stackoverflow.com/questions/9452775/converting-numpy-dtypes-to-native-python-types
             losses.update(loss.data.cpu().numpy().item(), batch_size)
             if MIXUP_FLAG:
-                correct = (lam * preds.eq(targets_a.data).cpu().sum().float() +
+                # TODO: accuracy bugfix
+                top1 = (lam * preds.eq(targets_a.data).cpu().sum().float() +
                            (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
-                accs.update(correct.cpu().numpy().item(), batch_size)
+                accs.update(top1.cpu().numpy().item(), batch_size)
 
             else:
                 # https://discuss.pytorch.org/t/trying-to-pass-too-many-cpu-scalars-to-cuda-kernel/87757/4
-                correct = torch.sum(preds == targets.data)
-                accs.update(correct.cpu().numpy().item(), batch_size)
+                top1 = accuracy(outputs, targets)[0]
+                # top1 = torch.sum(preds == targets.data)
+                accs.update(top1.cpu().numpy().item(), batch_size)
 
+            # TODO: 정확도 이상함. 100% 가 넘어간다.
             if batch_idx % 10 == 0:
                 tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
                     epoch, batch_idx * len(images), len(train_loader.dataset),
@@ -257,8 +260,8 @@ def main():
                 images, targets = images.cuda(), targets.cuda()
 
             with torch.no_grad():
-                outputs = model(images, targets)  # arcface
-                # _, outputs = model(images)  # cosine-softmax
+                # outputs = model(images, targets)  # arcface
+                _, outputs = model(images)  # cosine-softmax
 
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
@@ -272,12 +275,11 @@ def main():
                 # outputs = outputs.view(args.batch_size, 8, -1).mean(1)
 
                 loss = criterion(outputs, targets)
-                preds = torch.argmax(outputs.data, 1)
-                correct = torch.sum(preds == targets.data)
 
+                top1 = accuracy(outputs, targets)[0]
                 batch_size = float(images.size(0))
                 losses.update(loss.data.cpu().numpy().item(), batch_size)
-                accs.update(correct.cpu().numpy().item(), batch_size)
+                accs.update(top1.cpu().numpy().item(), batch_size)
 
                 tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' % (losses.avg, accs.avg))
 

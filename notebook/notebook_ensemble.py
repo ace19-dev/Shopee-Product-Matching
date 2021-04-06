@@ -1,6 +1,6 @@
 dataset_root = '/home/ace19/dl_data/shopee-product-matching'
 dataset_name = 'product'
-modelname = 'tf_efficientnet_b4_ns'
+modelname = 'dm_nfnet_f0'
 test_batch_size = 1
 workers = 4
 no_cuda = False
@@ -10,11 +10,12 @@ seed = 8
 #              '(2021-03-17_21:10:32)product_fold3_380x380_tf_efficientnet_b4_ns_acc(54.97810)_loss(0.26047)_checkpoint30.pth.tar'
 
 MODELS = [
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold0_380x380_tf_efficientnet_b4_ns_acc(54.07299)_loss(0.26073)_checkpoint29.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold1_380x380_tf_efficientnet_b4_ns_acc(54.48175)_loss(0.26214)_checkpoint30.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold2_380x380_tf_efficientnet_b4_ns_acc(54.36496)_loss(0.26438)_checkpoint29.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold3_380x380_tf_efficientnet_b4_ns_acc(54.97810)_loss(0.26047)_checkpoint30.pth.tar',
-    'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold4_380x380_tf_efficientnet_b4_ns_acc(54.46715)_loss(0.2576)_checkpoint30.pth.tar',
+    # 'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold0_380x380_tf_efficientnet_b4_ns_acc(54.07299)_loss(0.26073)_checkpoint29.pth.tar',
+    # 'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold1_380x380_tf_efficientnet_b4_ns_acc(54.48175)_loss(0.26214)_checkpoint30.pth.tar',
+    # 'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold2_380x380_tf_efficientnet_b4_ns_acc(54.36496)_loss(0.26438)_checkpoint29.pth.tar',
+    # 'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold3_380x380_tf_efficientnet_b4_ns_acc(54.97810)_loss(0.26047)_checkpoint30.pth.tar',
+    # 'experiments/shopee-product-matching/tf_efficientnet_b4_ns_1/(2021-03-17_21:10:32)product_fold4_380x380_tf_efficientnet_b4_ns_acc(54.46715)_loss(0.2576)_checkpoint30.pth.tar',
+    'experiments/shopee-product-matching/dm_nfnet_f0/(2021-04-07_01:11:01)product_fold3_192x192_dm_nfnet_f0_acc(76.91533)_loss(8.66141)_checkpoint27.pth.tar'
 ]
 
 import albumentations as A
@@ -44,49 +45,114 @@ import timm
 from pprint import pprint
 
 
+class CosineSoftmaxModule(nn.Module):
+    def __init__(self, features_dim, nclass=11014):
+        super(CosineSoftmaxModule, self).__init__()
+        self.nclass = nclass
+
+        in_channels = features_dim  # BertModel: 768
+
+        self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
+        self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
+        self.fc = nn.Linear(in_channels, in_channels)
+        # self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.dropout = nn.Dropout(p=0.1, inplace=False)
+        # # self.bn2 = nn.BatchNorm2d(in_channels, eps=1e-05)
+        # self.features = nn.BatchNorm1d(in_channels, eps=1e-05)
+        # self.flatten = Flatten()
+
+        # # for arcface
+        # self.in_features = self.pretrained.classifier.in_features
+        # self.margin = ArcModule(in_features=in_channels, out_features=nclass)
+        # self.bn1 = nn.BatchNorm2d(self.in_features)
+        # # self.bn1 = nn.BatchNorm1d(in_channels, eps=1e-05)
+        # self.dropout = nn.Dropout2d(0.2, inplace=True)
+        # # self.dropout = nn.Dropout(p=0.4, inplace=True)
+        # self.fc1 = nn.Linear(self.in_features * 12 * 12, in_channels)
+        # # self.fc1 = nn.Linear(self.in_features, in_channels)
+        # self.bn2 = nn.BatchNorm1d(in_channels)
+
+    def forward(self, x):
+        ##################
+        # COSINE-SOFTMAX
+        ##################
+        # x = x.view(-1, num_flat_features(x))
+        # x = self.dropout(x)
+        x = self.fc(x)
+
+        features = x
+        # Features in rows, normalize axis 1.
+        features = F.normalize(features, p=2, dim=1, eps=1e-8)
+
+        # Mean vectors in colums, normalize axis 0.
+        weights_normed = F.normalize(self.weights, p=2, dim=0, eps=1e-8)
+        logits = self.scale.cuda() * torch.mm(features.cuda(), weights_normed.cuda())  # torch.matmul
+
+        return features, logits
+
+        # ##################
+        # # ArcFace -
+        # #   https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
+        # ##################
+        # features = self.bn1(x)
+        # features = self.dropout(features)
+        # features = features.view(features.size(0), -1)
+        # features = self.fc1(features)
+        # features = self.bn2(features)
+        # features = F.normalize(features)
+        # if labels is not None:
+        #     return self.margin(features, labels)
+        #
+        # return features
+
+
 class Model(nn.Module):
     def __init__(self, backbone, nclass=11014):
         super(Model, self).__init__()
         self.backbone = backbone
-        self.ncode = 32
-        #         self.nclass = nclass
+        self.nclass = nclass
 
         model_names = timm.list_models(pretrained=True)
         pprint(model_names)
         self.pretrained = timm.create_model(self.backbone, pretrained=False, num_classes=nclass)
-        # Below code is used when if pretrained is False
-        pre_model = torch.load('/home/ace19/.cache/torch/checkpoints/tf_efficientnet_b4_ns-d6313a46.pth')
-        #         del pre_model['fc.weight']
-        #         del pre_model['fc.bias']
-        del pre_model['classifier.weight']
-        del pre_model['classifier.bias']
-        self.pretrained.load_state_dict(pre_model, strict=False)
-        #         self.pretrained.fc = nn.Linear(in_channels, nclass),
+        # # Below code is used when if pretrained is False
+        pre_model = torch.load('/home/ace19/.cache/torch/hub/checkpoints/dm_nfnet_f0-604f9c3a.pth')
+        del pre_model['head.fc.weight']
+        del pre_model['head.fc.bias']
+        # self.pretrained.load_state_dict(pre_model, strict=False)
 
-        in_channels = 512  # resnet18, resnet34
+        self.in_channels = 512  # resnet18, resnet34
         if self.backbone in ['resnet18', 'resnet34', 'vgg16', 'vgg19']:
-            in_channels = 512
+            self.in_channels = 512
         elif self.backbone in ['seresnext50_32x4d', 'resnext101_32x8d', 'resnext50_32x4d',
                                'resnest50d', 'resnest101e', 'resnest200e', 'resnet50',
-                               'resnest269e', 'resnet101', 'resnet152']:
-            in_channels = 2048
+                               'resnest269e', 'resnet101', 'resnet152', 'resnest50d_4s2x40d']:
+            self.in_channels = 2048
         elif self.backbone.startswith('tf_efficientnet_b0'):
-            in_channels = 1280
+            self.in_channels = 1280
         elif self.backbone.startswith('tf_efficientnet_b1'):
-            in_channels = 1280
+            self.in_channels = 1280
         elif self.backbone.startswith('tf_efficientnet_b2'):
-            in_channels = 1408
+            self.in_channels = 1408
         elif self.backbone.startswith('tf_efficientnet_b3'):
-            in_channels = 1536
+            self.in_channels = 1536
         elif self.backbone.startswith('tf_efficientnet_b4'):
-            in_channels = 1792
+            self.in_channels = 1792
         elif self.backbone.startswith('tf_efficientnet_b5'):
-            in_channels = 2048
+            self.in_channels = 2048
+        # https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/nfnet.py
+        elif self.backbone.startswith('dm_nfnet_f'):
+            self.in_channels = 3072
 
-        self.weights = torch.nn.Parameter(torch.randn(in_channels, nclass))
-        self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
-        self.fc = nn.Linear(in_channels, in_channels)
-        self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.cosine_softmax = CosineSoftmaxModule(self.in_channels, nclass)
+
+        # # TODO: make arcface func.
+        # self.margin = ArcModule(in_features=self.in_channels, out_features=nclass)
+        # # self.bn1 = nn.BatchNorm2d(self.in_channels)
+        # # self.dropout = nn.Dropout2d(0.4, inplace=True)
+        # # self.fc1 = nn.Linear(self.in_channels * 16 * 16, self.in_channels)    # original
+        # self.fc1 = nn.Linear(self.in_channels, self.in_channels)
+        # self.bn2 = nn.BatchNorm1d(self.in_channels)
 
     def forward(self, x):
         if self.backbone.startswith('tf_efficientnet'):
@@ -98,7 +164,7 @@ class Model(nn.Module):
             x = self.pretrained.bn2(x)
             x = self.pretrained.act2(x)
             x = self.pretrained.global_pool(x)
-            # return self.pretrained.classifier(x)
+
         elif self.backbone.startswith('resnet') or \
                 self.backbone.startswith('resnext') or \
                 self.backbone.startswith('seresnext') or \
@@ -113,21 +179,30 @@ class Model(nn.Module):
             x = self.pretrained.layer4(x)
             x = self.pretrained.global_pool(x)
 
-        # COSINE-SOFTMAX
-        # feature_dim = x.size()[1]
-        # x = x.view(-1, num_flat_features(x))
-        x = F.dropout2d(x, p=0.1)
-        # x = self.fc(x)
+        elif self.backbone.startswith('dm_nfnet'):
+            x = self.pretrained.stem(x)
+            x = self.pretrained.stages(x)
+            x = self.pretrained.final_conv(x)
+            x = self.pretrained.final_act(x)
+            x = self.pretrained.head.global_pool(x)
 
-        features = x
-        # Features in rows, normalize axis 1.
-        features = F.normalize(features, p=2, dim=1, eps=1e-8)
+        return self.cosine_softmax(x)
 
-        # Mean vectors in colums, normalize axis 0.
-        weights_normed = F.normalize(self.weights, p=2, dim=0, eps=1e-8)
-        logits = self.scale.cuda() * torch.mm(features.cuda(), weights_normed.cuda())  # torch.matmul
 
-        return features, logits
+        # ##################
+        # # ArcFace -
+        # #   https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
+        # ##################
+        # # features = self.bn1(x)
+        # # features = self.dropout(features)
+        # # features = features.view(features.size(0), -1)
+        # features = self.fc1(x)
+        # features = self.bn2(features)
+        # features = F.normalize(features, eps=1e-8)
+        # if labels is not None:
+        #     return self.margin(features, labels)
+        #
+        # return features
 
 
 import cv2
@@ -223,7 +298,7 @@ for resume in MODELS:
             best_pred = checkpoint['best_pred']
             acc_lst_train = checkpoint['acc_lst_train']
             acc_lst_val = checkpoint['acc_lst_val']
-            model.load_state_dict(checkpoint['state_dict'])
+            model.load_state_dict(checkpoint['state_dict'], strict=False)
             print("=> loaded checkpoint '{}' (epoch {})".format(resume, checkpoint['epoch']))
         else:
             raise RuntimeError("=> no resume checkpoint found at '{}'".format(resume))
