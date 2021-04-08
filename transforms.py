@@ -28,9 +28,9 @@ CROP_WIDTH = 192
 TEST_CROP_HEIGHT = 256  # 380
 TEST_CROP_WIDTH = 256
 
-_, rand_augment, _ = transforms_imagenet_train((CROP_HEIGHT, CROP_WIDTH),
-                                               auto_augment='original-mstd0.5',
-                                               separate=True)
+# _, rand_augment, _ = transforms_imagenet_train((CROP_HEIGHT, CROP_WIDTH),
+#                                                auto_augment='original-mstd0.5',
+#                                                separate=True)
 
 
 # https://github.com/uoguelph-mlrg/Cutout/blob/master/util/cutout.py
@@ -115,7 +115,7 @@ def training_augmentation3():
         # ], p=0.3),
         # A.Blur(blur_limit=3, p=0.3),
         # A.RandomGamma(p=0.5),
-        # A.RandomBrightnessContrast(p=0.1),
+        A.RandomBrightnessContrast(p=0.3),
         # # A.HueSaturationValue(p=0.5),
         A.ShiftScaleRotate(p=0.3),
         # A.CoarseDropout(max_holes=3, p=0.3),

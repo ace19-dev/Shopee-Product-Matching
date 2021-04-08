@@ -170,8 +170,8 @@ def main():
                 # adjust lambda to exactly match pixel ratio
                 lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
 
-                # outputs = model(images, targets)  # arcface
-                _, outputs = model(images)  # cosine-softmax
+                outputs = model(images, targets)  # arcface
+                # _, outputs = model(images)  # cosine-softmax
 
                 # loss = criterion(activations=outputs,
                 #                  labels=torch.nn.functional.one_hot(target_a),
@@ -198,8 +198,8 @@ def main():
                     #             + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float())
                 else:
                     MIXUP_FLAG = False
-                    # outputs = model(images, targets)  # arcface
-                    _, outputs = model(images)  # cosine-softmax
+                    outputs = model(images, targets)  # arcface
+                    # _, outputs = model(images)  # cosine-softmax
                     # print('outputs:', outputs.shape)
                     # print('targets:', targets.shape)
 
@@ -231,7 +231,6 @@ def main():
                 # top1 = torch.sum(preds == targets.data)
                 accs.update(top1.cpu().numpy().item(), batch_size)
 
-            # TODO: 정확도 이상함. 100% 가 넘어간다.
             if batch_idx % 10 == 0:
                 tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
                     epoch, batch_idx * len(images), len(train_loader.dataset),
@@ -260,8 +259,8 @@ def main():
                 images, targets = images.cuda(), targets.cuda()
 
             with torch.no_grad():
-                # outputs = model(images, targets)  # arcface
-                _, outputs = model(images)  # cosine-softmax
+                outputs = model(images, targets)  # arcface
+                # _, outputs = model(images)  # cosine-softmax
 
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
@@ -275,7 +274,6 @@ def main():
                 # outputs = outputs.view(args.batch_size, 8, -1).mean(1)
 
                 loss = criterion(outputs, targets)
-
                 top1 = accuracy(outputs, targets)[0]
                 batch_size = float(images.size(0))
                 losses.update(loss.data.cpu().numpy().item(), batch_size)
@@ -375,7 +373,7 @@ def main():
                                                  num_workers=args.workers,
                                                  pin_memory=True)
 
-        model = M.Model(backbone=args.model, nclass=NUM_CLASS)
+        model = M.Model(model_name=args.model, nclass=NUM_CLASS)
         # model.half()  # to save space.
         logger.info('\n-------------- model details --------------')
         logger.info(model)
@@ -391,7 +389,7 @@ def main():
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
         criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=NUM_CLASS, smoothing=0.0)
+                                           num_cls=NUM_CLASS, smoothing=0.05)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
         # criterion = FocalLoss()

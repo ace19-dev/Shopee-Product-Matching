@@ -39,7 +39,8 @@ class Options():
         # tf_efficientnet_b2_ns w/ cosine-softmax: 0.001
         # tf_efficientnet_b2_ns w/ ArcFace: 0.0001
         # dm_nfnet_f0 w/ cosine-softmax: 0.0003
-        parser.add_argument('--lr', type=float, default=0.0003, metavar='LR',
+        # dm_nfnet_f0 w/ ArcFace: 0.00003 ??
+        parser.add_argument('--lr', type=float, default=0.00003, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
@@ -86,7 +87,7 @@ class Options():
                             help='hyperparameter beta')
         # parser.add_argument('--cutmix_prob', default=0.5, type=float,
         #                     help='cutmix probability')
-        parser.add_argument('--cutmix_prob', default=0.5, type=float,
+        parser.add_argument('--cutmix_prob', default=0.6, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')
