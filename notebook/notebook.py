@@ -84,7 +84,7 @@ class CosineSoftmaxModule(nn.Module):
         # Features in rows, normalize axis 1.
         features = F.normalize(features, p=2, dim=1, eps=1e-8)
 
-        # Mean vectors in colums, normalize axis 0.
+        # Mean vectors in    colums, normalize axis 0.
         weights_normed = F.normalize(self.weights, p=2, dim=0, eps=1e-8)
         logits = self.scale.cuda() * torch.mm(features.cuda(), weights_normed.cuda())  # torch.matmul
 

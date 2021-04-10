@@ -65,7 +65,7 @@ class CosineSoftmaxModule(nn.Module):
         super(CosineSoftmaxModule, self).__init__()
         self.nclass = nclass
 
-        in_channels = features_dim  # BertModel: 768
+        in_channels = features_dim
 
         self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
         nn.init.xavier_uniform_(self.weight)
@@ -85,7 +85,6 @@ class CosineSoftmaxModule(nn.Module):
         features = x
         # Features in rows, normalize axis 1.
         features = F.normalize(features, p=2, dim=1, eps=1e-8)
-
         # Mean vectors in colums, normalize axis 0.
         weights_normed = F.normalize(self.weights, p=2, dim=0, eps=1e-8)
         logits = self.scale.cuda() * torch.mm(features.cuda(), weights_normed.cuda())  # torch.matmul
@@ -94,9 +93,10 @@ class CosineSoftmaxModule(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, model_name, nclass=11014):
+    def __init__(self, model_name, use_fc=False, fc_dim=512, nclass=11014):
         super(Model, self).__init__()
         self.model_name = model_name
+        self.use_fc = use_fc
         self.nclass = nclass
 
         print('Building Model Backbone for {} model'.format(model_name))
@@ -141,9 +141,19 @@ class Model(nn.Module):
         ##################
         # ArcFace - https://www.kaggle.com/parthdhameliya77/pytorch-resnext50-32x4d-image-tfidf-inference
         ##################
-        self.margin = ArcMarginProduct(self.in_channels, self.nclass)
+        self.margin = ArcMarginProduct(fc_dim, self.nclass)
+        self.pooling = nn.AdaptiveAvgPool2d(1)
+        self.dropout = nn.Dropout(p=0.1, inplace=False)
+        self.fc = nn.Linear(self.in_channels, fc_dim)
+        self.bn = nn.BatchNorm1d(fc_dim)
+        nn.init.xavier_normal_(self.fc.weight)
+        nn.init.constant_(self.fc.bias, 0)
+        nn.init.constant_(self.bn.weight, 1)
+        nn.init.constant_(self.bn.bias, 0)
 
     def forward(self, x, labels):
+        batch_size = x.shape[0]
+
         if self.model_name.startswith('tf_efficientnet'):
             x = self.backbone.conv_stem(x)
             x = self.backbone.bn1(x)
@@ -152,7 +162,7 @@ class Model(nn.Module):
             x = self.backbone.conv_head(x)
             x = self.backbone.bn2(x)
             x = self.backbone.act2(x)
-            x = self.backbone.global_pool(x)
+            # x = self.backbone.global_pool(x)
 
         elif self.model_name.startswith('resnet') or \
                 self.model_name.startswith('resnext') or \
@@ -166,14 +176,16 @@ class Model(nn.Module):
             x = self.backbone.layer2(x)
             x = self.backbone.layer3(x)
             x = self.backbone.layer4(x)
-            x = self.backbone.global_pool(x)
+            # x = self.backbone.global_pool(x)
 
         elif self.model_name.startswith('dm_nfnet'):
             x = self.backbone.stem(x)
             x = self.backbone.stages(x)
             x = self.backbone.final_conv(x)
             x = self.backbone.final_act(x)
-            x = self.backbone.head.global_pool(x)
+            # x = self.backbone.head.global_pool(x)
+
+        x = self.pooling(x).view(batch_size, -1)
 
         ##################
         # cosine-softmax
@@ -183,5 +195,25 @@ class Model(nn.Module):
         ##################
         # ArcFace - https://www.kaggle.com/parthdhameliya77/pytorch-resnext50-32x4d-image-tfidf-inference
         ##################
-        return self.margin(x, labels)   # train
-        # return x    # inference
+        # ---------------
+        # original paper
+        # ---------------
+        # features = self.backbone.features(x)
+        # features = self.bn1(features)
+        # features = self.dropout(features)
+        # features = features.view(features.size(0), -1)
+        # features = self.fc1(features)
+        # features = self.bn2(features)
+        # features = F.normalize(features)
+        # return self.margin(features, labels)
+
+        if self.use_fc:
+            x = self.dropout(x)
+            x = self.fc(x)
+            x = self.bn(x)
+
+        # logits when training
+        return self.margin(x, labels)
+
+        # features when inference
+        # return x

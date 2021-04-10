@@ -9,6 +9,8 @@ Our final submission first averaged the probabilities of the predicted classes o
 This averaged probability vector was then merged with the predicted probabilities of EfficientnetB4 and CropNet
 in the second stage. For this purpose, the values were simply summed up -> 확율 누적.
 
+https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
+
 '''
 
 import pprint
@@ -19,11 +21,12 @@ from tensorboardX import SummaryWriter
 from torch.autograd import Variable
 
 import transforms
-from models import model as M
+# from models import model as M
+from models.shopeenet import ShopeeNet
 from datasets.product import ProductDataset, NUM_CLASS
 from datasets.sampler import ImbalancedDatasetSampler
 from option import Options
-from training.lr_scheduler import LR_Scheduler
+from training.lr_scheduler import *
 from training.losses import FocalLoss
 from training.taylor_cross_entropy_loss import TaylorCrossEntropyLoss
 from utils.training_helper import *
@@ -37,6 +40,25 @@ lr = 0.0
 
 IMAGE_SIZE = str(transforms.CROP_HEIGHT) + 'x' + \
              str(transforms.CROP_WIDTH)
+
+SCHEDULER = 'CosineAnnealingWarmRestarts'  # 'CosineAnnealingLR'
+factor = 0.2  # ReduceLROnPlateau
+patience = 4  # ReduceLROnPlateau
+eps = 1e-6  # ReduceLROnPlateau
+T_max = 10  # CosineAnnealingLR
+T_0 = 4  # CosineAnnealingWarmRestarts
+min_lr = 1e-6
+
+
+def fetch_scheduler(SCHEDULER, optimizer):
+    if SCHEDULER == 'ReduceLROnPlateau':
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=factor, patience=patience, verbose=True,
+                                      eps=eps)
+    elif SCHEDULER == 'CosineAnnealingLR':
+        scheduler = CosineAnnealingLR(optimizer, T_max=T_max, eta_min=min_lr, last_epoch=-1)
+    elif SCHEDULER == 'CosineAnnealingWarmRestarts':
+        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=min_lr, last_epoch=-1)
+    return scheduler
 
 
 def lr_step_func(epoch):
@@ -148,7 +170,7 @@ def main():
         # last_time = time.time()
         tbar = tqdm(train_loader, desc='\r')
         for batch_idx, (images, targets, fnames) in enumerate(tbar):
-            scheduler(optimizer, batch_idx, epoch, best_pred)
+            # scheduler(optimizer, batch_idx, epoch, best_pred)
 
             if args.cuda:
                 images, targets = images.cuda(), targets.cuda()
@@ -188,8 +210,8 @@ def main():
                     # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
                     inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
                     inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    # outputs = model(images, targets)  # arcface
-                    _, outputs = model(images)  # cosine-softmax
+                    outputs = model(images, targets)  # arcface
+                    # _, outputs = model(images)  # cosine-softmax
                     loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
                     # train_loss += loss.data[0]
                     # _, preds = torch.max(outputs.data, 1)
@@ -214,7 +236,7 @@ def main():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            # scheduler.step()
+            scheduler.step()
 
             batch_size = float(images.size(0))
             # https://stackoverflow.com/questions/9452775/converting-numpy-dtypes-to-native-python-types
@@ -222,7 +244,7 @@ def main():
             if MIXUP_FLAG:
                 # TODO: accuracy bugfix
                 top1 = (lam * preds.eq(targets_a.data).cpu().sum().float() +
-                           (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
+                        (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
                 accs.update(top1.cpu().numpy().item(), batch_size)
 
             else:
@@ -373,7 +395,9 @@ def main():
                                                  num_workers=args.workers,
                                                  pin_memory=True)
 
-        model = M.Model(model_name=args.model, nclass=NUM_CLASS)
+        # model = M.Model(model_name=args.model, use_fc=True, nclass=NUM_CLASS)
+        # https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
+        model = ShopeeNet(n_classes=NUM_CLASS, model_name=args.model)
         # model.half()  # to save space.
         logger.info('\n-------------- model details --------------')
         logger.info(model)
@@ -389,7 +413,7 @@ def main():
         # criterion = BiTemperedLogisticLoss(t1=0.8, t2=1.4, smoothing=0.06)
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
         criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
-                                           num_cls=NUM_CLASS, smoothing=0.05)
+                                           num_cls=NUM_CLASS, smoothing=0.0)
         # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
         # criterion = FocalLoss()
@@ -412,14 +436,20 @@ def main():
         # logger.info(optimizer.__str__())
 
         logger.info('\n-------------- scheduler details --------------')
-        # TODO: change scheduler: CosineAnnealingWarmRestarts
-        # scheduler = \
-        #     torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 5, args.epochs)
-        scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
-                                 len(train_loader) // args.batch_size,
-                                 args.lr_step, warmup_epochs=4)
-        # scheduler = \
-        #     torch.optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lr_step_func)
+        # scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
+        #                          len(train_loader) // args.batch_size,
+        #                          args.lr_step, warmup_epochs=5)
+
+        # https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
+        scheduler_params = {
+            "lr_start": 1e-5,
+            "lr_max": 1e-5 * args.batch_size,
+            "lr_min": 1e-6,
+            "lr_ramp_ep": 5,
+            "lr_sus_ep": 0,
+            "lr_decay": 0.8,
+        }
+        scheduler = ShopeeScheduler(optimizer, **scheduler_params)
         logger.info(scheduler.__str__())
 
         if args.cuda:
