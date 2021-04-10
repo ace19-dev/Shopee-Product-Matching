@@ -41,24 +41,25 @@ lr = 0.0
 IMAGE_SIZE = str(transforms.CROP_HEIGHT) + 'x' + \
              str(transforms.CROP_WIDTH)
 
-SCHEDULER = 'CosineAnnealingWarmRestarts'  # 'CosineAnnealingLR'
-factor = 0.2  # ReduceLROnPlateau
-patience = 4  # ReduceLROnPlateau
-eps = 1e-6  # ReduceLROnPlateau
-T_max = 10  # CosineAnnealingLR
-T_0 = 4  # CosineAnnealingWarmRestarts
-min_lr = 1e-6
 
-
-def fetch_scheduler(SCHEDULER, optimizer):
-    if SCHEDULER == 'ReduceLROnPlateau':
-        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=factor, patience=patience, verbose=True,
-                                      eps=eps)
-    elif SCHEDULER == 'CosineAnnealingLR':
-        scheduler = CosineAnnealingLR(optimizer, T_max=T_max, eta_min=min_lr, last_epoch=-1)
-    elif SCHEDULER == 'CosineAnnealingWarmRestarts':
-        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=min_lr, last_epoch=-1)
-    return scheduler
+# SCHEDULER = 'CosineAnnealingWarmRestarts'  # 'CosineAnnealingLR'
+# factor = 0.2  # ReduceLROnPlateau
+# patience = 4  # ReduceLROnPlateau
+# eps = 1e-6  # ReduceLROnPlateau
+# T_max = 10  # CosineAnnealingLR
+# T_0 = 4  # CosineAnnealingWarmRestarts
+# min_lr = 1e-6
+#
+#
+# def fetch_scheduler(SCHEDULER, optimizer):
+#     if SCHEDULER == 'ReduceLROnPlateau':
+#         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=factor, patience=patience, verbose=True,
+#                                       eps=eps)
+#     elif SCHEDULER == 'CosineAnnealingLR':
+#         scheduler = CosineAnnealingLR(optimizer, T_max=T_max, eta_min=min_lr, last_epoch=-1)
+#     elif SCHEDULER == 'CosineAnnealingWarmRestarts':
+#         scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=1, eta_min=min_lr, last_epoch=-1)
+#     return scheduler
 
 
 def lr_step_func(epoch):
@@ -131,6 +132,15 @@ def main():
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     print(args)
 
+    scheduler_params = {
+        "lr_start": 1e-5,
+        "lr_max": 1e-5 * args.batch_size,
+        "lr_min": 1e-6,
+        "lr_ramp_ep": 5,
+        "lr_sus_ep": 0,
+        "lr_decay": 0.8,
+    }
+
     # world_size = int(os.environ['WORLD_SIZE'])
     # rank = int(os.environ['RANK'])
     # dist_url = "tcp://{}:{}".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"])
@@ -162,8 +172,8 @@ def main():
         local_step = 0
         MIXUP_FLAG = False
 
-        losses = AverageMeter()
-        accs = AverageMeter()
+        loss_score = AverageMeter()
+        acc_score = AverageMeter()
 
         model.train()
 
@@ -192,9 +202,7 @@ def main():
                 # adjust lambda to exactly match pixel ratio
                 lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (images.size()[-1] * images.size()[-2]))
 
-                outputs = model(images, targets)  # arcface
-                # _, outputs = model(images)  # cosine-softmax
-
+                _, outputs = model(images, targets)
                 # loss = criterion(activations=outputs,
                 #                  labels=torch.nn.functional.one_hot(target_a),
                 #                  t1=0.5, t2=1.5) * lam + \
@@ -210,8 +218,8 @@ def main():
                     # Mixup (from https://github.com/facebookresearch/mixup-cifar10/blob/master/train.py)
                     inputs, targets_a, targets_b, lam = mixup_data(images, targets, args.alpha)
                     inputs, targets_a, targets_b = map(Variable, (images, targets_a, targets_b))
-                    outputs = model(images, targets)  # arcface
-                    # _, outputs = model(images)  # cosine-softmax
+
+                    _, outputs = model(images, targets)
                     loss = mixup_criterion(criterion, outputs, targets_a, targets_b, lam)
                     # train_loss += loss.data[0]
                     # _, preds = torch.max(outputs.data, 1)
@@ -220,8 +228,7 @@ def main():
                     #             + (1 - lam) * preds.eq(targets_b.data).cpu().sum().float())
                 else:
                     MIXUP_FLAG = False
-                    outputs = model(images, targets)  # arcface
-                    # _, outputs = model(images)  # cosine-softmax
+                    _, outputs = model(images, targets)
                     # print('outputs:', outputs.shape)
                     # print('targets:', targets.shape)
 
@@ -236,42 +243,45 @@ def main():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            scheduler.step()
+            # scheduler.step()
 
             batch_size = float(images.size(0))
             # https://stackoverflow.com/questions/9452775/converting-numpy-dtypes-to-native-python-types
-            losses.update(loss.data.cpu().numpy().item(), batch_size)
+            loss_score.update(loss.data.cpu().numpy().item(), batch_size)
             if MIXUP_FLAG:
                 # TODO: accuracy bugfix
                 top1 = (lam * preds.eq(targets_a.data).cpu().sum().float() +
                         (1 - lam) * preds.eq(targets_b.data).cpu().sum().float()).long()
-                accs.update(top1.cpu().numpy().item(), batch_size)
+                acc_score.update(top1.cpu().numpy().item(), batch_size)
 
             else:
                 # https://discuss.pytorch.org/t/trying-to-pass-too-many-cpu-scalars-to-cuda-kernel/87757/4
                 top1 = accuracy(outputs, targets)[0]
                 # top1 = torch.sum(preds == targets.data)
-                accs.update(top1.cpu().numpy().item(), batch_size)
+                acc_score.update(top1.cpu().numpy().item(), batch_size)
 
-            if batch_idx % 10 == 0:
-                tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
-                    epoch, batch_idx * len(images), len(train_loader.dataset),
-                           100. * batch_idx / len(train_loader), losses.avg, accs.avg))
+            # if batch_idx % 10 == 0:
+            #     tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
+            #         epoch, batch_idx * len(images), len(train_loader.dataset),
+            #                100. * batch_idx / len(train_loader), loss_score.avg, acc_score.avg))
+            tbar.set_postfix(Train_Loss=loss_score.avg, Epoch=epoch, LR=optimizer.param_groups[0]['lr'])
 
-        logger.info('[Train] Loss: {:.4f} Acc: {:.4f}'.format(losses.avg, accs.avg))
+        scheduler.step()
+
+        logger.info('[Train] Loss: {:.4f} Acc: {:.4f}'.format(loss_score.avg, acc_score.avg))
 
         writer = writer_dict['writer']
         global_steps = writer_dict['train_global_steps']
-        writer.add_scalar('train_loss', losses.avg, global_steps)
-        writer.add_scalar('train_acc', accs.avg, global_steps)
+        writer.add_scalar('train_loss', loss_score.avg, global_steps)
+        writer.add_scalar('train_acc', acc_score.avg, global_steps)
         writer_dict['train_global_steps'] = global_steps + 1
 
     def validate(epoch):
         global best_pred, acc_lst_train, acc_lst_val
         is_best = False
 
-        losses = AverageMeter()
-        accs = AverageMeter()
+        loss_score = AverageMeter()
+        acc_score = AverageMeter()
 
         model.eval()
 
@@ -281,8 +291,7 @@ def main():
                 images, targets = images.cuda(), targets.cuda()
 
             with torch.no_grad():
-                outputs = model(images, targets)  # arcface
-                # _, outputs = model(images)  # cosine-softmax
+                _, outputs = model(images, targets)
 
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
@@ -298,24 +307,25 @@ def main():
                 loss = criterion(outputs, targets)
                 top1 = accuracy(outputs, targets)[0]
                 batch_size = float(images.size(0))
-                losses.update(loss.data.cpu().numpy().item(), batch_size)
-                accs.update(top1.cpu().numpy().item(), batch_size)
+                loss_score.update(loss.data.cpu().numpy().item(), batch_size)
+                acc_score.update(top1.cpu().numpy().item(), batch_size)
 
-                tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' % (losses.avg, accs.avg))
+                # tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' % (loss_score.avg, acc_score.avg))
+                tbar.set_postfix(Eval_Loss=loss_score.avg)
 
-        logger.info('[Validate] Loss: %.5f | Acc: %.5f' % (losses.avg, accs.avg))
+        logger.info('[Validate] Loss: %.5f | Acc: %.5f' % (loss_score.avg, acc_score.avg))
 
         writer = writer_dict['writer']
         global_steps = writer_dict['valid_global_steps']
-        writer.add_scalar('valid_loss', losses.avg, global_steps)
-        writer.add_scalar('valid_acc', accs.avg, global_steps)
+        writer.add_scalar('valid_loss', loss_score.avg, global_steps)
+        writer.add_scalar('valid_acc', acc_score.avg, global_steps)
         writer_dict['valid_global_steps'] = global_steps + 1
 
         # save checkpoint
-        acc_lst_val += [accs.avg]
-        if accs.avg > best_pred:
-            logger.info('** [best_pred]: {:.4f}'.format(accs.avg))
-            best_pred = accs.avg
+        acc_lst_val += [acc_score.avg]
+        if acc_score.avg > best_pred:
+            logger.info('** [best_pred]: {:.4f}'.format(acc_score.avg))
+            best_pred = acc_score.avg
             is_best = True
         save_checkpoint({
             'epoch': epoch,
@@ -324,7 +334,7 @@ def main():
             'best_pred': best_pred,
             'acc_lst_train': acc_lst_train,
             'acc_lst_val': acc_lst_val,
-        }, logger=logger, args=args, loss=losses.avg, is_best=is_best,
+        }, logger=logger, args=args, loss=loss_score.avg, is_best=is_best,
             image_size=IMAGE_SIZE, create_at=create_at, filename=args.checkpoint_name,
             foldname=valset.fold_name())
 
@@ -397,7 +407,7 @@ def main():
 
         # model = M.Model(model_name=args.model, use_fc=True, nclass=NUM_CLASS)
         # https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
-        model = ShopeeNet(n_classes=NUM_CLASS, model_name=args.model)
+        model = ShopeeNet(n_classes=NUM_CLASS, model_name=args.model, use_fc=False)
         # model.half()  # to save space.
         logger.info('\n-------------- model details --------------')
         logger.info(model)
@@ -428,8 +438,8 @@ def main():
         #                             momentum=args.momentum, weight_decay=args.weight_decay)
         # https://github.com/clovaai/AdamP
         from adamp import AdamP
-        optimizer = AdamP(model.parameters(), lr=args.lr, betas=(0.9, 0.999),
-                          weight_decay=args.weight_decay)
+        optimizer = AdamP(model.parameters(), lr=scheduler_params['lr_start'],
+                          betas=(0.9, 0.999), weight_decay=args.weight_decay)
         logger.info(optimizer.__str__())
 
         # optimizer = Lookahead(optimizer)
@@ -441,14 +451,6 @@ def main():
         #                          args.lr_step, warmup_epochs=5)
 
         # https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
-        scheduler_params = {
-            "lr_start": 1e-5,
-            "lr_max": 1e-5 * args.batch_size,
-            "lr_min": 1e-6,
-            "lr_ramp_ep": 5,
-            "lr_sus_ep": 0,
-            "lr_decay": 0.8,
-        }
         scheduler = ShopeeScheduler(optimizer, **scheduler_params)
         logger.info(scheduler.__str__())
 

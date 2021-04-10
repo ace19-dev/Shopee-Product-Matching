@@ -65,7 +65,7 @@ class ShopeeNet(nn.Module):
             logits = self.final(feature, label)
         else:
             logits = self.final(feature)
-        return logits
+        return feature, logits
 
     def extract_feat(self, x):
         batch_size = x.shape[0]
