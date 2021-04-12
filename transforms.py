@@ -21,12 +21,12 @@ normalize = Normalize(mean=[0.485, 0.456, 0.406],
 # normalize = Normalize(mean=[0.5, 0.5, 0.5],
 #                       std=[0.5, 0.5, 0.5])
 
-CROP_HEIGHT = 512  # 380
-CROP_WIDTH = 512
+CROP_HEIGHT = 224  # 380
+CROP_WIDTH = 224
 
 # https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/nfnet.py
-TEST_CROP_HEIGHT = 512  # 380
-TEST_CROP_WIDTH = 512
+TEST_CROP_HEIGHT = 224  # 380
+TEST_CROP_WIDTH = 224
 
 # _, rand_augment, _ = transforms_imagenet_train((CROP_HEIGHT, CROP_WIDTH),
 #                                                auto_augment='original-mstd0.5',

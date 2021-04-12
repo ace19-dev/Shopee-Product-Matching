@@ -1,4 +1,5 @@
 import timm
+from pprint import pprint
 
 from training.metric_learning_losses import *
 
@@ -9,7 +10,7 @@ class ShopeeNet(nn.Module):
                  model_name='efficientnet_b0',
                  use_fc=False,
                  fc_dim=512,
-                 dropout=0.0,
+                 dropout=0.1,
                  loss_module='arcface',
                  s=30.0,
                  margin=0.50,
@@ -24,13 +25,29 @@ class ShopeeNet(nn.Module):
         :param loss_module: One of ('arcface', 'cosface', 'softmax')
         """
         super(ShopeeNet, self).__init__()
+
+        self.model_name = model_name
+
         print('Building Model Backbone for {} model'.format(model_name))
+        model_names = timm.list_models(pretrained=True)
+        pprint(model_names)
 
         self.backbone = timm.create_model(model_name, pretrained=pretrained)
-        final_in_features = self.backbone.classifier.in_features
 
-        self.backbone.classifier = nn.Identity()
-        self.backbone.global_pool = nn.Identity()
+        if model_name.startswith('seresnext50'):
+            final_in_features = self.backbone.fc.in_features
+            self.backbone.fc = nn.Identity()
+            self.backbone.global_pool = nn.Identity()
+
+        elif model_name.startswith('tf_efficientnet_b'):
+            final_in_features = self.backbone.classifier.in_features
+            self.backbone.classifier = nn.Identity()
+            self.backbone.global_pool = nn.Identity()
+
+        elif model_name.startswith('dm_nfnet_f'):
+            final_in_features = self.backbone.head.fc.in_features
+            self.backbone.head.fc = nn.Identity()
+            self.backbone.head.global_pool = nn.Identity()
 
         self.pooling = nn.AdaptiveAvgPool2d(1)
 
@@ -78,3 +95,6 @@ class ShopeeNet(nn.Module):
             x = self.bn(x)
 
         return x
+
+    def __str__(self):
+        return 'model_name: {}, use_fc: {}'.format(self.model_name, self.use_fc)

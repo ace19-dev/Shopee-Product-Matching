@@ -68,9 +68,9 @@ class CosineSoftmaxModule(nn.Module):
         in_channels = features_dim
 
         self.weights = torch.nn.Parameter(torch.randn(in_channels, self.nclass))
-        nn.init.xavier_uniform_(self.weight)
+        nn.init.xavier_uniform_(self.weights)
         self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
-        nn.init.xavier_uniform_(self.scale)
+        # nn.init.xavier_uniform_(self.scale)
         self.fc = nn.Linear(in_channels, in_channels)
         self.dropout = nn.Dropout(p=0.1, inplace=False)
 

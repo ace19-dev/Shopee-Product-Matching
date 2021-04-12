@@ -104,14 +104,10 @@ def main():
             local_step += 1
 
             # ArcFace
-            outputs = model(input_ids, input_mask, labels)
+            # _, outputs = model(input_ids, input_mask, labels)
             # # cosine-softmax
             # # https://huggingface.co/transformers/model_doc/bert.html
-            # _, outputs = model(input_ids, input_mask)
-            # print('outputs:', outputs.shape)
-            # print('labels:', labels.shape)
-            # print('outputs:', outputs)
-            # print('labels:', labels)
+            _, outputs = model(input_ids, input_mask)
 
             # loss = criterion(activations=outputs,
             #                  labels=torch.nn.functional.one_hot(targets),
@@ -164,9 +160,9 @@ def main():
 
             with torch.no_grad():
                 # ArcFace
-                outputs = model(input_ids, input_mask, labels)
+                # _, outputs = model(input_ids, input_mask, labels)
                 # # cosine-softmax
-                # _, outputs = model(input_ids, input_mask)
+                _, outputs = model(input_ids, input_mask)
 
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
@@ -267,7 +263,7 @@ def main():
 
         # config = BertConfig.from_pretrained('bert-base-multilingual-cased')
         # model = BertModel(config)
-        model = M.Model(backbone=args.model, nclass=NUM_CLASS)
+        model = M.Model(n_classes=NUM_CLASS, model_name='bert', use_fc=True)
         logger.info('\n-------------- model details --------------')
         logger.info(model)
 
@@ -283,9 +279,9 @@ def main():
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
         # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
         #                                    num_cls=NUM_CLASS, smoothing=0.0)
-        criterion = torch.nn.CrossEntropyLoss()
+        # criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        # criterion = FocalLoss()
+        criterion = FocalLoss()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         # logger.info('\n-------------- loss details --------------')
