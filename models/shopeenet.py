@@ -33,23 +33,24 @@ class ShopeeNet(nn.Module):
         pprint(model_names)
 
         self.backbone = timm.create_model(model_name, pretrained=pretrained)
+        pprint(self.backbone)
 
         if model_name.startswith('seresnext50'):
             final_in_features = self.backbone.fc.in_features
             self.backbone.fc = nn.Identity()
-            self.backbone.global_pool = nn.Identity()
+            # self.backbone.global_pool = nn.Identity()
 
         elif model_name.startswith('tf_efficientnet_b'):
             final_in_features = self.backbone.classifier.in_features
             self.backbone.classifier = nn.Identity()
-            self.backbone.global_pool = nn.Identity()
+            # self.backbone.global_pool = nn.Identity()
 
         elif model_name.startswith('dm_nfnet_f'):
             final_in_features = self.backbone.head.fc.in_features
             self.backbone.head.fc = nn.Identity()
-            self.backbone.head.global_pool = nn.Identity()
+            # self.backbone.head.global_pool = nn.Identity()
 
-        self.pooling = nn.AdaptiveAvgPool2d(1)
+        # self.pooling = nn.AdaptiveAvgPool2d(1)
 
         self.use_fc = use_fc
         if use_fc:
@@ -87,7 +88,7 @@ class ShopeeNet(nn.Module):
     def extract_feat(self, x):
         batch_size = x.shape[0]
         x = self.backbone(x)
-        x = self.pooling(x).view(batch_size, -1)
+        # x = self.pooling(x).view(batch_size, -1)
 
         if self.use_fc:
             x = self.dropout(x)

@@ -22,18 +22,24 @@ import pandas as pd
 
 from sklearn.model_selection import GroupKFold, StratifiedKFold
 from sklearn.utils import shuffle
+from sklearn.preprocessing import LabelEncoder
 
 
 def create_labels():
-    train_df = pd.read_csv(os.path.join(args.source, 'train_ori.csv'))
+    train_df = pd.read_csv(os.path.join(args.source, 'train_original.csv'))
 
-    # https://www.kaggle.com/vicioussong/rapids-tfidfvectorizer-cv-0-734
-    label_posting_ids = train_df.groupby('label_group').posting_id.agg('unique').to_dict()
-    for _label, (key, value) in enumerate(sorted(label_posting_ids.items())):
-        idxs = train_df.loc[train_df['posting_id'].isin(value)].index.tolist()
-        for idx in idxs:
-            train_df.loc[idx, 'label'] = _label
+    # https://www.kaggle.com/vatsalmavani/shopee-training-eff-b4
+    labelencoder = LabelEncoder()
+    train_df['label'] = labelencoder.fit_transform(train_df['label_group'])
 
+    # # https://www.kaggle.com/vicioussong/rapids-tfidfvectorizer-cv-0-734
+    # label_posting_ids = train_df.groupby('label_group').posting_id.agg('unique').to_dict()
+    # for _label, (key, value) in enumerate(sorted(label_posting_ids.items())):
+    #     idxs = train_df.loc[train_df['posting_id'].isin(value)].index.tolist()
+    #     for idx in idxs:
+    #         train_df.loc[idx, 'label'] = _label
+
+    # 참고.
     # tmp = train.groupby('label_group').posting_id.agg('unique').to_dict()
     # train['target'] = train.label_group.map(tmp)
     # print('train shape is', train.shape)
@@ -43,8 +49,6 @@ def create_labels():
 
 
 def split_train_val(logger):
-    # NUM_CLASSES = 5
-
     train_df = pd.read_csv(os.path.join(args.source, 'train.csv'))
     logger.info('total: {}'.format(len(train_df)))
     logger.info('train shape: {}\n'.format(train_df.shape))
@@ -61,7 +65,7 @@ def split_train_val(logger):
 
     # 가장 긴 문자열의 길이: 357
     # https://www.javaer101.com/ko/article/2975648.html
-    print(train_df.title.map(lambda x: len(x)).max())
+    # print(train_df.title.map(lambda x: len(x)).max())
 
     logger.info('unique posting id: {}'.format(len(train_df['posting_id'].unique())))
     logger.info('unique image: {}'.format(len(train_df['image'].unique())))
@@ -174,7 +178,7 @@ def main(args):
     # test_groupkfold()
 
     # reference on https://www.kaggle.com/reighns/groupkfold-efficientbnet
-    # create_labels()
+    create_labels()
     split_train_val(logger)
 
     # temp
@@ -185,10 +189,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--source',
                         type=str,
-                        default='/home/ace19/dl_data/shopee-product-matching-0',
+                        default='/home/ace19/dl_data/shopee-product-matching',
                         help='Where is train image to load')
     parser.add_argument('--target', type=str,
-                        default='/home/ace19/dl_data/shopee-product-matching-0/fold',
+                        default='/home/ace19/dl_data/shopee-product-matching/fold',
                         help='directory to save splited dataset')
 
     args = parser.parse_args()

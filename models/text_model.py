@@ -107,29 +107,29 @@ class Model(nn.Module):
         nn.init.constant_(self.bn.bias, 0)
 
     # cosine-softmax
-    def forward(self, input_ids, input_mask):
-        if self.model_name.startswith('bert'):
-            outputs = self.backbone(input_ids=input_ids,
-                                      attention_mask=input_mask,
-                                      output_hidden_states=True)
-
-        return self.cosine_softmax(outputs['pooler_output'])
-
-    # # ArcFace
-    # # https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
-    # def forward(self, input_ids, input_mask, labels):
+    # def forward(self, input_ids, input_mask):
     #     if self.model_name.startswith('bert'):
     #         outputs = self.backbone(input_ids=input_ids,
-    #                                 attention_mask=input_mask, )
+    #                                   attention_mask=input_mask,
+    #                                   output_hidden_states=True)
     #
-    #     x = outputs['pooler_output']
-    #     if self.use_fc:
-    #         x = self.dropout(x)
-    #         x = self.fc(x)
-    #         feature = self.bn(x)
-    #
-    #     if self.loss_module in ('arcface', 'cosface', 'adacos'):
-    #         logits = self.final(feature, labels)
-    #     else:
-    #         logits = self.final(feature)
-    #     return feature, logits
+    #         return self.cosine_softmax(outputs['pooler_output'])
+
+    # ArcFace
+    # https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
+    def forward(self, input_ids, input_mask, labels):
+        if self.model_name.startswith('bert'):
+            outputs = self.backbone(input_ids=input_ids,
+                                    attention_mask=input_mask, )
+
+        x = outputs['pooler_output']
+        if self.use_fc:
+            x = self.dropout(x)
+            x = self.fc(x)
+            feature = self.bn(x)
+
+        if self.loss_module in ('arcface', 'cosface', 'adacos'):
+            logits = self.final(feature, labels)
+        else:
+            logits = self.final(feature)
+        return feature, logits

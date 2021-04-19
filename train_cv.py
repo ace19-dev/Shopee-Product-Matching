@@ -21,7 +21,7 @@ from tensorboardX import SummaryWriter
 from torch.autograd import Variable
 
 import transforms
-# from models import model as M
+from models import model as M
 from models.shopeenet import ShopeeNet
 from datasets.product import ProductDataset, NUM_CLASS
 from datasets.sampler import ImbalancedDatasetSampler
@@ -133,9 +133,9 @@ def main():
     print(args)
 
     scheduler_params = {
-        "lr_start": 1e-5,
-        "lr_max": 1e-5 * args.batch_size,
-        "lr_min": 1e-6,
+        "lr_start": 2e-5,   # 2e-5
+        "lr_max": 2e-5 * args.batch_size,
+        "lr_min": 2e-6,     # 2e-6
         "lr_ramp_ep": 5,
         "lr_sus_ep": 0,
         "lr_decay": 0.8,
@@ -405,10 +405,11 @@ def main():
                                                  num_workers=args.workers,
                                                  pin_memory=True)
 
-        # model = M.Model(model_name=args.model, use_fc=True, nclass=NUM_CLASS)
+        # cosine-softmax
+        # model = M.Model(model_name=args.model, nclass=NUM_CLASS)
         # https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
         model = ShopeeNet(n_classes=NUM_CLASS, model_name=args.model,
-                          use_fc=False, dropout=0.1)
+                          use_fc=True, fc_dim=512, dropout=0.1)
         # model.half()  # to save space.
         logger.info('\n-------------- model details --------------')
         print(model)
@@ -436,11 +437,14 @@ def main():
         logger.info('\n-------------- optimizer details --------------')
         # optimizer = torch.optim.SGD(model.parameters(),
         #                             lr=args.lr,
-        #                             momentum=args.momentum, weight_decay=args.weight_decay)
+        #                             momentum=args.momentum,
+        #                             weight_decay=args.weight_decay)
         # https://github.com/clovaai/AdamP
         from adamp import AdamP
         optimizer = AdamP(model.parameters(), lr=scheduler_params['lr_start'],
                           betas=(0.9, 0.999), weight_decay=args.weight_decay)
+        # optimizer = torch.optim.Adam(model.parameters(), lr=scheduler_params['lr_start'],
+        #                              betas=(0.9, 0.999), weight_decay=args.weight_decay)
         logger.info(optimizer.__str__())
 
         # optimizer = Lookahead(optimizer)
@@ -449,8 +453,7 @@ def main():
         logger.info('\n-------------- scheduler details --------------')
         # scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
         #                          len(train_loader) // args.batch_size,
-        #                          args.lr_step, warmup_epochs=5)
-
+        #                          args.lr_step, warmup_epochs=4)
         # https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
         scheduler = ShopeeScheduler(optimizer, **scheduler_params)
         logger.info(scheduler.__str__())
@@ -478,9 +481,13 @@ def main():
                 best_pred = checkpoint['best_pred']
                 acc_lst_train = checkpoint['acc_lst_train']
                 acc_lst_val = checkpoint['acc_lst_val']
-                not_to_be_applied = ['module.pretrained.classifier.weight',
-                                     'module.pretrained.classifier.bias',
-                                     'module.cosine_softmax.weights']
+                not_to_be_applied = ['module.backbone.classifier.weight',
+                                     'module.backbone.classifier.bias',
+                                     'module.cosine_softmax.weights',
+                                     'module.cosine_softmax.scale',
+                                     'module.cosine_softmax.fc.weight',
+                                     'module.cosine_softmax.fc.bias'
+                                     ]
                 pretrained_dict = checkpoint['state_dict']
                 new_model_dict = model.state_dict()
                 pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in not_to_be_applied}

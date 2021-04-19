@@ -17,8 +17,8 @@ class Options():
                             help='output directory name')
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
-        # model params  tf_efficientnet_b3_ns
-        parser.add_argument('--model', type=str, default='bert',
+        # model params  tf_efficientnet_b3_ns   resnext101_32x8d
+        parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
                             help='network model type (default: dm_nfnet_f0)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
@@ -29,18 +29,18 @@ class Options():
                             metavar='N', help='batch size for training (default: 128)')
         parser.add_argument('--test-batch-size', type=int, default=32,
                             metavar='N', help='batch size for testing (default: 256)')
-        parser.add_argument('--epochs', type=int, default=35, metavar='N',
+        parser.add_argument('--epochs', type=int, default=25, metavar='N',
                             help='number of epochs to train (default: 600)')
         parser.add_argument('--start_epoch', type=int, default=1,
                             metavar='N', help='the epoch number to start (default: 1)')
         parser.add_argument('--workers', type=int, default=4,
                             metavar='N', help='dataloader threads')
         # lr:
-        # tf_efficientnet_b2_ns w/ cosine-softmax: 0.001
-        # tf_efficientnet_b2_ns w/ ArcFace: 0.0001
+        # tf_efficientnet_b2_ns w/ cosine-softmax: 0.0002
+        # tf_efficientnet_b2_ns w/ ArcFace: 0.00001
         # dm_nfnet_f0 w/ cosine-softmax: 0.0003
-        # dm_nfnet_f0 w/ ArcFace: 0.00003 ??
-        parser.add_argument('--lr', type=float, default=0.00001, metavar='LR',
+        # dm_nfnet_f0 w/ ArcFace: 0.00001
+        parser.add_argument('--lr', type=float, default=0.00003, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
@@ -63,8 +63,8 @@ class Options():
                             default=None,
                             # default='pre-trained/noisy-student-efficientnet-b2.pth',
                             # 'efficientnet-b7_ns_aa-original-mstd0.5_re_100k_v4_cad79a/snapshot_100000.fp16.pth',
-                            # default='experiments/shopee-product-matching/tf_efficientnet_b2_ns_1/'
-                            #         '(2021-03-31_21:37:05)product_fold1_512x512_tf_efficientnet_b2_ns_acc(18.97635)_loss(8.0072)_checkpoint30.pth.tar',
+                            # default='experiments/shopee-product-matching/tf_efficientnet_b4_ns/'
+                            #         '(2021-04-18_21:16:40)product_fold1_512x512_tf_efficientnet_b4_ns_acc(35.86861)_loss(10.38755)_checkpoint30.pth.tar',
                             help='put the path to resuming file if needed')
         parser.add_argument('--checkpoint_name', type=str, default='product',
                             help='set the checkpoint name')
@@ -87,7 +87,7 @@ class Options():
                             help='hyperparameter beta')
         # parser.add_argument('--cutmix_prob', default=0.5, type=float,
         #                     help='cutmix probability')
-        parser.add_argument('--cutmix_prob', default=0.6, type=float,
+        parser.add_argument('--cutmix_prob', default=0.3, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')

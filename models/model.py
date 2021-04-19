@@ -72,7 +72,7 @@ class CosineSoftmaxModule(nn.Module):
         self.scale = torch.nn.Parameter(F.softplus(torch.randn(())))
         # nn.init.xavier_uniform_(self.scale)
         self.fc = nn.Linear(in_channels, in_channels)
-        self.dropout = nn.Dropout(p=0.1, inplace=False)
+        self.dropout = nn.Dropout(p=0.2, inplace=False)
 
     def forward(self, x):
         ##################
@@ -136,20 +136,20 @@ class Model(nn.Module):
         ##################
         # cosine-softmax
         ##################
-        # self.cosine_softmax = CosineSoftmaxModule(self.in_channels, nclass)
+        self.cosine_softmax = CosineSoftmaxModule(self.in_channels, nclass)
 
-        ##################
-        # ArcFace - https://www.kaggle.com/parthdhameliya77/pytorch-resnext50-32x4d-image-tfidf-inference
-        ##################
-        self.margin = ArcMarginProduct(fc_dim, self.nclass)
-        self.pooling = nn.AdaptiveAvgPool2d(1)
-        self.dropout = nn.Dropout(p=0.1, inplace=False)
-        self.fc = nn.Linear(self.in_channels, fc_dim)
-        self.bn = nn.BatchNorm1d(fc_dim)
-        nn.init.xavier_normal_(self.fc.weight)
-        nn.init.constant_(self.fc.bias, 0)
-        nn.init.constant_(self.bn.weight, 1)
-        nn.init.constant_(self.bn.bias, 0)
+        # ##################
+        # # ArcFace - https://www.kaggle.com/parthdhameliya77/pytorch-resnext50-32x4d-image-tfidf-inference
+        # ##################
+        # self.margin = ArcMarginProduct(fc_dim, self.nclass)
+        # self.pooling = nn.AdaptiveAvgPool2d(1)
+        # self.dropout = nn.Dropout(p=0.1, inplace=False)
+        # self.fc = nn.Linear(self.in_channels, fc_dim)
+        # self.bn = nn.BatchNorm1d(fc_dim)
+        # nn.init.xavier_normal_(self.fc.weight)
+        # nn.init.constant_(self.fc.bias, 0)
+        # nn.init.constant_(self.bn.weight, 1)
+        # nn.init.constant_(self.bn.bias, 0)
 
     def forward(self, x, labels):
         batch_size = x.shape[0]
@@ -162,7 +162,7 @@ class Model(nn.Module):
             x = self.backbone.conv_head(x)
             x = self.backbone.bn2(x)
             x = self.backbone.act2(x)
-            # x = self.backbone.global_pool(x)
+            x = self.backbone.global_pool(x)
 
         elif self.model_name.startswith('resnet') or \
                 self.model_name.startswith('resnext') or \
@@ -176,21 +176,21 @@ class Model(nn.Module):
             x = self.backbone.layer2(x)
             x = self.backbone.layer3(x)
             x = self.backbone.layer4(x)
-            # x = self.backbone.global_pool(x)
+            x = self.backbone.global_pool(x)
 
         elif self.model_name.startswith('dm_nfnet'):
             x = self.backbone.stem(x)
             x = self.backbone.stages(x)
             x = self.backbone.final_conv(x)
             x = self.backbone.final_act(x)
-            # x = self.backbone.head.global_pool(x)
+            x = self.backbone.head.global_pool(x)
 
-        x = self.pooling(x).view(batch_size, -1)
+        # x = self.pooling(x).view(batch_size, -1)
 
         ##################
         # cosine-softmax
         ##################
-        # return self.cosine_softmax(x)
+        return self.cosine_softmax(x)
 
         ##################
         # ArcFace - https://www.kaggle.com/parthdhameliya77/pytorch-resnext50-32x4d-image-tfidf-inference
@@ -207,13 +207,13 @@ class Model(nn.Module):
         # features = F.normalize(features)
         # return self.margin(features, labels)
 
-        if self.use_fc:
-            x = self.dropout(x)
-            x = self.fc(x)
-            x = self.bn(x)
-
-        # logits when training
-        return self.margin(x, labels)
-
-        # features when inference
-        # return x
+        # if self.use_fc:
+        #     x = self.dropout(x)
+        #     x = self.fc(x)
+        #     x = self.bn(x)
+        #
+        # # logits when training
+        # return self.margin(x, labels)
+        #
+        # # features when inference
+        # # return x
