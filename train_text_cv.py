@@ -32,26 +32,26 @@ acc_lst_train = []
 acc_lst_val = []
 
 
-def get_lr(optimizer):
-    for param_group in optimizer.param_groups:
-        return param_group["lr"]
-
-
-def freeze_until(net, param_name):
-    # print([k for k, v in net.named_parameters()])
-    found_name = False
-    for name, params in net.named_parameters():
-        if name == param_name:
-            found_name = True
-        params.requires_grad = found_name
-
-
-def freeze_bn(net):
-    for name, params in net.named_parameters():
-        if 'bn' in name:
-            params.requires_grad = False
-        else:
-            params.requires_grad = True
+# def get_lr(optimizer):
+#     for param_group in optimizer.param_groups:
+#         return param_group["lr"]
+#
+#
+# def freeze_until(net, param_name):
+#     # print([k for k, v in net.named_parameters()])
+#     found_name = False
+#     for name, params in net.named_parameters():
+#         if name == param_name:
+#             found_name = True
+#         params.requires_grad = found_name
+#
+#
+# def freeze_bn(net):
+#     for name, params in net.named_parameters():
+#         if 'bn' in name:
+#             params.requires_grad = False
+#         else:
+#             params.requires_grad = True
 
 
 def main():

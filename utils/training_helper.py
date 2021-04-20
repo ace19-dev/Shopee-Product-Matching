@@ -208,3 +208,25 @@ def accuracy(output, target, topk=(1,)):
             correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
+
+
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group["lr"]
+
+
+def freeze_until(net, param_name):
+    # print([k for k, v in net.named_parameters()])
+    found_name = False
+    for name, params in net.named_parameters():
+        if name == param_name:
+            found_name = True
+        params.requires_grad = found_name
+
+
+def freeze_bn(net):
+    for name, params in net.named_parameters():
+        if 'bn' in name:
+            params.requires_grad = False
+        else:
+            params.requires_grad = True
