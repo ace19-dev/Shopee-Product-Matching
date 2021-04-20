@@ -5,7 +5,16 @@ import torch.utils.data as data
 from sklearn.preprocessing import LabelEncoder
 
 NUM_CLASS = 11014
-# MAX_LENGTH = 30
+MAX_LENGTH = 30
+
+
+def df_loc_by_list(df, key, values):
+    df = df.loc[df[key].isin(values)]
+    df = df.assign(sort=pd.Categorical(df[key], categories=values, ordered=True))
+    df = df.sort_values('sort')
+    # df = df.reset_index()
+    df = df.drop('sort', axis=1)
+    return df
 
 
 class ProductTextDataset(data.Dataset):
@@ -25,6 +34,7 @@ class ProductTextDataset(data.Dataset):
         self.df = df_loc_by_list(self.df, 'posting_id', samples)
         self.labels = self.df['label_code'].values
 
+        # TODO: test refine title
         texts = list(self.df['title'].apply(lambda o: str(o)).values)
         self.encodings = tokenizer(texts,
                                    padding=True,
@@ -95,12 +105,3 @@ class ProductTextTestDataset(data.Dataset):
 
     def __len__(self):
         return len(self.df)
-
-
-def df_loc_by_list(df, key, values):
-    df = df.loc[df[key].isin(values)]
-    df = df.assign(sort=pd.Categorical(df[key], categories=values, ordered=True))
-    df = df.sort_values('sort')
-    # df = df.reset_index()
-    df = df.drop('sort', axis=1)
-    return df
