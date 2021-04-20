@@ -172,7 +172,8 @@ def display_data(data, fnames):
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
-    def __init__(self):
+    def __init__(self, name="Metric"):
+        self.name = name
         self.reset()
 
     def reset(self):
@@ -186,6 +187,10 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+    def __repr__(self):
+        text = f"{self.name}: {self.avg:.5f}"
+        return text
 
 
 def accuracy(output, target, topk=(1,)):

@@ -9,8 +9,7 @@ import pprint
 import timeit
 from tqdm import tqdm
 
-from transformers import BertTokenizer, AutoTokenizer
-# from transformers import BertModel, BertConfig, AdamW
+from transformers import BertTokenizer, BertModel, DistilBertTokenizer, DistilBertModel
 from transformers import get_linear_schedule_with_warmup
 
 from tensorboardX import SummaryWriter
@@ -18,11 +17,11 @@ from tensorboardX import SummaryWriter
 
 # import transforms
 from models import text_model as M
-from datasets.product import ProductTextDataset, NUM_CLASS
+from datasets.product_text import ProductTextDataset, NUM_CLASS
 from datasets.sampler import ImbalancedDatasetSampler
 from option import Options
 from training.losses import FocalLoss
-from training.lr_scheduler import LR_Scheduler
+from training.lr_scheduler import *
 from training.taylor_cross_entropy_loss import TaylorCrossEntropyLoss
 from utils.training_helper import *
 from utils.image_helper import *
@@ -31,7 +30,11 @@ from utils.image_helper import *
 best_pred = 0.0
 acc_lst_train = []
 acc_lst_val = []
-lr = 0.0
+
+
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group["lr"]
 
 
 def freeze_until(net, param_name):
@@ -57,6 +60,16 @@ def main():
     args, args_desc = Options().parse()
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     print(args)
+
+    scheduler_params = {
+        "lr_start": 2e-5,  # 2e-5
+        "lr_max": 2e-5 * 32,
+        # "lr_max": 2e-5 * 64,
+        "lr_min": 2e-6,  # 2e-6
+        "lr_ramp_ep": 5,
+        "lr_sus_ep": 0,
+        "lr_decay": 0.8,
+    }
 
     # world_size = int(os.environ['WORLD_SIZE'])
     # rank = int(os.environ['RANK'])
@@ -87,109 +100,102 @@ def main():
 
         local_step = 0
 
-        losses = AverageMeter()
-        accs = AverageMeter()
+        loss_score = AverageMeter()
+        acc_score = AverageMeter()
 
         model.train()
 
         # last_time = time.time()
         tbar = tqdm(train_loader, desc='\r')
-        for batch_idx, (input_ids, input_mask, labels, pos_id) in enumerate(tbar):
-            scheduler(optimizer, batch_idx, epoch, best_pred)
+        for batch_idx, batch in enumerate(tbar):
+            # scheduler(optimizer, batch_idx, epoch, best_pred)
 
-            if args.cuda:
-                input_ids, input_mask, labels = \
-                    input_ids.cuda(), input_mask.cuda(), labels.cuda()
+            batch = {k: v.cuda() for k, v in batch.items()}
+            # if args.cuda:
+            #     input_ids, input_mask, labels = \
+            #         input_ids.cuda(), input_mask.cuda(), labels.cuda()
 
             local_step += 1
 
             # ArcFace
-            # _, outputs = model(input_ids, input_mask, labels)
-            # # cosine-softmax
-            # # https://huggingface.co/transformers/model_doc/bert.html
-            _, outputs = model(input_ids, input_mask)
-
+            preds = model(batch)
+            loss = criterion(preds, batch['labels'])
             # loss = criterion(activations=outputs,
             #                  labels=torch.nn.functional.one_hot(targets),
             #                  t1=0.5, t2=1.5)
-            loss = criterion(outputs, labels)
-
-            preds = torch.argmax(outputs.data, 1)
-            # print('preds:', preds)
-            # compute gradient and do SGD step
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             # scheduler.step()
 
-            batch_size = float(input_ids.size(0))
-            # https://stackoverflow.com/questions/9452775/converting-numpy-dtypes-to-native-python-types
-            losses.update(loss.data.cpu().numpy().item(), batch_size)
-            # https://discuss.pytorch.org/t/trying-to-pass-too-many-cpu-scalars-to-cuda-kernel/87757/4
-            correct = torch.sum(preds == labels.data)
-            accs.update(correct.cpu().numpy().item(), batch_size)
+            batch_size = batch['input_ids'].size(0)
+            loss_score.update(loss.item(), batch_size)
+            preds = preds.argmax(dim=1)
+            correct = (preds == batch['labels']).float().mean()
+            acc_score.update(correct.item(), batch_size)
 
-            if batch_idx % 10 == 0:
-                tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
-                    epoch, batch_idx * len(input_ids), len(train_loader.dataset),
-                           100. * batch_idx / len(train_loader), losses.avg, accs.avg))
+            # if batch_idx % 10 == 0:
+            #     tbar.set_description('[Train] Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tAcc: {:.6f}'.format(
+            #         epoch, batch_idx * len(input_ids), len(train_loader.dataset),
+            #                100. * batch_idx / len(train_loader), loss_score.avg, acc_score.avg))
+            tbar.set_postfix(train_loss=loss_score.avg, accuracy=acc_score.avg, lr=optimizer.param_groups[0]['lr'])
 
-        logger.info('[Train] Loss: {:.4f} Acc: {:.4f}'.format(losses.avg, accs.avg))
+        scheduler.step()
+
+        logger.info('[Train] Loss: {:.4f} Acc: {:.4f}'.format(loss_score.avg, acc_score.avg))
 
         writer = writer_dict['writer']
         global_steps = writer_dict['train_global_steps']
-        writer.add_scalar('train_loss', losses.avg, global_steps)
-        writer.add_scalar('train_acc', accs.avg, global_steps)
+        writer.add_scalar('train_loss', loss_score.avg, global_steps)
+        writer.add_scalar('train_acc', acc_score.avg, global_steps)
         writer_dict['train_global_steps'] = global_steps + 1
 
     def validate(epoch):
         global best_pred, acc_lst_train, acc_lst_val
         is_best = False
 
-        losses = AverageMeter()
-        accs = AverageMeter()
+        loss_score = AverageMeter()
+        acc_score = AverageMeter()
 
         model.eval()
 
         tbar = tqdm(val_loader, desc='\r')
-        for batch_idx, (input_ids, input_mask, labels, pos_id) in enumerate(tbar):
-            if args.cuda:
-                input_ids, input_mask, labels = \
-                    input_ids.cuda(), input_mask.cuda(), labels.cuda()
+        for batch in tbar:
+            batch = {k: v.cuda() for k, v in batch.items()}
+            # if args.cuda:
+            #     input_ids, input_mask, labels = \
+            #         input_ids.cuda(), input_mask.cuda(), labels.cuda()
 
             with torch.no_grad():
                 # ArcFace
-                # _, outputs = model(input_ids, input_mask, labels)
-                # # cosine-softmax
-                _, outputs = model(input_ids, input_mask)
-
+                preds = model(batch)
+                loss = criterion(preds, batch['labels'])
                 # test_loss += criterion(activations=outputs,
                 #                        labels=torch.nn.functional.one_hot(targets),
                 #                        t1=0.5, t2=1.5)
-                loss = criterion(outputs, labels)
-                preds = torch.argmax(outputs.data, 1)
-                correct = torch.sum(preds == labels.data)
+                batch_size = batch['input_ids'].size(0)
+                loss_score.update(loss.item(), batch_size)
+                preds = preds.argmax(dim=1)
+                correct = (preds == batch['labels']).float().mean()
+                acc_score.update(correct.item(), batch_size)
 
-                batch_size = float(input_ids.size(0))
-                losses.update(loss.data.cpu().numpy().item(), batch_size)
-                accs.update(correct.cpu().numpy().item(), batch_size)
+                # tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' % (loss_score.avg, acc_score.avg))
+                tbar.set_postfix(valid_loss=loss_score.avg, accuracy=acc_score.avg)
 
-                tbar.set_description('\r[Validate] Loss: %.5f | Top1: %.5f' % (losses.avg, accs.avg))
-
-        logger.info('[Validate] Loss: %.5f | Acc: %.5f' % (losses.avg, accs.avg))
+        logger.info('[Validate] Loss: %.5f | Acc: %.5f' % (loss_score.avg, acc_score.avg))
 
         writer = writer_dict['writer']
         global_steps = writer_dict['valid_global_steps']
-        writer.add_scalar('valid_loss', losses.avg, global_steps)
-        writer.add_scalar('valid_acc', accs.avg, global_steps)
+        writer.add_scalar('valid_loss', loss_score.avg, global_steps)
+        writer.add_scalar('valid_acc', acc_score.avg, global_steps)
         writer_dict['valid_global_steps'] = global_steps + 1
 
         # save checkpoint
-        acc_lst_val += [accs.avg]
-        if accs.avg > best_pred:
-            logger.info('** [best_pred]: {:.4f}'.format(accs.avg))
-            best_pred = accs.avg
+        acc_lst_val += [acc_score.avg]
+        if acc_score.avg > best_pred:
+            logger.info('** [best_pred]: {:.4f}'.format(acc_score.avg))
+            best_pred = acc_score.avg
             is_best = True
         save_checkpoint({
             'epoch': epoch,
@@ -198,20 +204,27 @@ def main():
             'best_pred': best_pred,
             'acc_lst_train': acc_lst_train,
             'acc_lst_val': acc_lst_val,
-        }, logger=logger, args=args, loss=losses.avg, is_best=is_best,
+        }, logger=logger, args=args, loss=loss_score.avg, is_best=is_best,
             create_at=create_at, filename=args.checkpoint_name, foldname=valset.fold_name())
 
     logger.info('\n-------------- tokenizer --------------')
-    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-uncased', do_lower_case=False)
+    if args.model == 'DistilBERT':
+        model_name = 'cahya/distilbert-base-indonesian'
+        tokenizer = DistilBertTokenizer.from_pretrained(model_name)
+        bert_model = DistilBertModel.from_pretrained(model_name)
+    else:
+        model_name = 'cahya/bert-base-indonesian-522M'
+        tokenizer = BertTokenizer.from_pretrained(model_name)
+        bert_model = BertModel.from_pretrained(model_name)
     logger.info(tokenizer)
     logger.info('\n')
 
     for train_filename, val_filename in zip(train_npzs, val_npzs):
-        logger.info('****************************')
+        logger.info('*****************************************')
         logger.info('fold: %s' % (train_filename.split('_')[1]))
         logger.info('train filename: %s' % (train_filename))
         logger.info('val filename: %s' % (val_filename))
-        logger.info('****************************\n')
+        logger.info('*****************************************\n')
 
         best_pred = 0.0
 
@@ -261,9 +274,7 @@ def main():
                                                  num_workers=args.workers,
                                                  pin_memory=True)
 
-        # config = BertConfig.from_pretrained('bert-base-multilingual-cased')
-        # model = BertModel(config)
-        model = M.Model(n_classes=NUM_CLASS, model_name='bert', use_fc=True)
+        model = M.Model(bert_model, num_classes=NUM_CLASS)
         logger.info('\n-------------- model details --------------')
         logger.info(model)
 
@@ -293,23 +304,20 @@ def main():
         #                             momentum=args.momentum, weight_decay=args.weight_decay)
         # https://github.com/clovaai/AdamP
         from adamp import AdamP
-        optimizer = AdamP(model.parameters(), lr=args.lr, betas=(0.9, 0.999),
-                          weight_decay=args.weight_decay)
+        optimizer = AdamP(model.parameters(), lr=scheduler_params['lr_start'],
+                          betas=(0.9, 0.999), weight_decay=args.weight_decay)
+        # optimizer = AdamP(model.parameters(), lr=args.lr, betas=(0.9, 0.999),
+        #                   weight_decay=args.weight_decay)
         logger.info(optimizer.__str__())
 
         # optimizer = Lookahead(optimizer)
         # logger.info(optimizer.__str__())
 
         logger.info('\n-------------- scheduler details --------------')
-        # scheduler = \
-        #     torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 5, args.epochs)
-        scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
-                                 len(train_loader) // args.batch_size,
-                                 args.lr_step, warmup_epochs=4)
-        total_steps = len(train_loader) * args.epochs
-        # scheduler = get_linear_schedule_with_warmup(optimizer,
-        #                                             num_warmup_steps=(total_steps/args.epochs)*3,
-        #                                             num_training_steps=total_steps)
+        # scheduler = LR_Scheduler(args.lr_scheduler, args.lr, args.epochs,
+        #                          len(train_loader) // args.batch_size,
+        #                          args.lr_step, warmup_epochs=4)
+        scheduler = ShopeeScheduler(optimizer, **scheduler_params)
         logger.info(scheduler.__str__())
 
         if args.cuda:
@@ -361,6 +369,10 @@ def main():
             logger.info('\n\n[%s] ------- Epoch %d -------' % (time.strftime("%Y/%m/%d %H:%M:%S"), epoch))
             train(epoch)
             validate(epoch)
+
+        if tokenizer is not None:
+            directory = "%s/%s/%s/" % (args.output, 'shopee-product-matching', args.model)
+            tokenizer.save_pretrained(directory + '(' + create_at + ')tokenizer')
 
         # dist.destroy_process_group()
 

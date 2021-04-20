@@ -8,10 +8,18 @@ import numpy as np
 import torch
 import torch.utils.data as data
 
-# from tensorflow.keras.preprocessing.sequence import pad_sequences
 
+# title_lengths = train['title'].apply(lambda x: len(x.split(" "))).to_numpy()
+# print(f"MIN words: {title_lengths.min()}, MAX words: {title_lengths.max()}")
+# plt.hist(title_lengths);
 NUM_CLASS = 11014
-MAX_LEN = 512  # TODO: check title max
+
+# https://www.kaggle.com/moeinshariatnia/indonesian-distilbert-finetuning-with-arcmargin
+# train = pd.read_csv("../input/shopee-product-matching/train.csv")
+# title_lengths = train['title'].apply(lambda x: len(x.split(" "))).to_numpy()
+# print(f"MIN words: {title_lengths.min()}, MAX words: {title_lengths.max()}")
+# plt.hist(title_lengths);
+MAX_LEN = 38
 
 
 class ProductTextDataset(data.Dataset):

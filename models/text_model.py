@@ -1,7 +1,7 @@
 import math
 from pprint import pprint
 
-from transformers import BertModel, BertConfig, BertForSequenceClassification
+# from transformers import BertModel, BertConfig, BertForSequenceClassification
 
 import torch
 import torch.nn as nn
@@ -46,90 +46,22 @@ class CosineSoftmaxModule(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self,
-                 n_classes,
-                 model_name='efficientnet_b0',
-                 use_fc=False,
-                 fc_dim=512,
-                 dropout=0.1,
-                 loss_module='arcface',
-                 s=30.0,
-                 margin=0.50,
-                 ls_eps=0.0,
-                 theta_zero=0.785,
-                 pretrained=True):
+    def __init__(self, bert_model, num_classes=11014, last_hidden_size=768):
         super(Model, self).__init__()
-        self.model_name = model_name
-        # self.nclass = nclass
+        self.bert_model = bert_model
+        self.arc_margin = ArcMarginProduct(last_hidden_size,
+                                           num_classes,
+                                           s=30.0,
+                                           m=0.50,
+                                           easy_margin=False)
 
-        # TODO: use various model
-        # self.pretrained = BertForSequenceClassification.from_pretrained("bert-base-multilingual-uncased",
-        #                                                       num_labels=nclass)
-        config = BertConfig.from_pretrained('bert-base-multilingual-uncased')
-        self.backbone = BertModel(config)
-        # self.backbone = BertForSequenceClassification(config)
-        # (pooler): BertPooler(
-        #     (dense): Linear(in_features=768, out_features=768, bias=True)
-        #     (activation): Tanh()
-        # )
-        # (dropout): Dropout(p=0.1, inplace=False)
-        # (classifier): Linear(in_features=768, out_features=2, bias=True)
-        print(self.backbone)
+    def get_bert_features(self, batch):
+        output = self.bert_model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'])
+        last_hidden_state = output.last_hidden_state  # shape: (batch_size, seq_length, bert_hidden_dim)
+        CLS_token_state = last_hidden_state[:, 0, :]  # obtaining CLS token state which is the first token.
+        return CLS_token_state
 
-        final_in_features = self.backbone.pooler.dense.out_features
-
-        self.cosine_softmax = CosineSoftmaxModule(final_in_features, n_classes)
-
-        # # arcface
-        # self.use_fc = use_fc
-        # if use_fc:
-        #     self.dropout = nn.Dropout(p=dropout)
-        #     self.fc = nn.Linear(final_in_features, fc_dim)
-        #     self.bn = nn.BatchNorm1d(fc_dim)
-        #     self._init_params()
-        #     final_in_features = fc_dim
-        #
-        # self.loss_module = loss_module
-        # if loss_module == 'arcface':
-        #     self.final = ArcMarginProduct(final_in_features, n_classes,
-        #                                   s=s, m=margin, easy_margin=False, ls_eps=ls_eps)
-        # elif loss_module == 'cosface':
-        #     self.final = AddMarginProduct(final_in_features, n_classes, s=s, m=margin)
-        # elif loss_module == 'adacos':
-        #     self.final = AdaCos(final_in_features, n_classes, m=margin, theta_zero=theta_zero)
-        # else:
-        #     self.final = nn.Linear(final_in_features, n_classes)
-
-    def _init_params(self):
-        nn.init.xavier_normal_(self.fc.weight)
-        nn.init.constant_(self.fc.bias, 0)
-        nn.init.constant_(self.bn.weight, 1)
-        nn.init.constant_(self.bn.bias, 0)
-
-    # cosine-softmax
-    # def forward(self, input_ids, input_mask):
-    #     if self.model_name.startswith('bert'):
-    #         outputs = self.backbone(input_ids=input_ids,
-    #                                   attention_mask=input_mask,
-    #                                   output_hidden_states=True)
-    #
-    #         return self.cosine_softmax(outputs['pooler_output'])
-
-    # ArcFace
-    # https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
-    def forward(self, input_ids, input_mask, labels):
-        if self.model_name.startswith('bert'):
-            outputs = self.backbone(input_ids=input_ids,
-                                    attention_mask=input_mask, )
-
-        x = outputs['pooler_output']
-        if self.use_fc:
-            x = self.dropout(x)
-            x = self.fc(x)
-            feature = self.bn(x)
-
-        if self.loss_module in ('arcface', 'cosface', 'adacos'):
-            logits = self.final(feature, labels)
-        else:
-            logits = self.final(feature)
-        return feature, logits
+    def forward(self, batch):
+        CLS_hidden_state = self.get_bert_features(batch)
+        output = self.arc_margin(CLS_hidden_state, batch['labels'])
+        return output

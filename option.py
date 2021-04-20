@@ -18,18 +18,20 @@ class Options():
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
         # model params  tf_efficientnet_b3_ns   resnext101_32x8d
-        parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
+        # parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
+        #                     help='network model type (default: dm_nfnet_f0)')
+        parser.add_argument('--model', type=str, default='DistilBERT',
                             help='network model type (default: dm_nfnet_f0)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
         # parser.add_argument('--widen', type=int, default=4, metavar='N',
         #     help='widen factor of the network (default: 4)')
         # training hyper params
-        parser.add_argument('--batch-size', type=int, default=32,
+        parser.add_argument('--batch-size', type=int, default=128,
                             metavar='N', help='batch size for training (default: 128)')
-        parser.add_argument('--test-batch-size', type=int, default=32,
+        parser.add_argument('--test-batch-size', type=int, default=128,
                             metavar='N', help='batch size for testing (default: 256)')
-        parser.add_argument('--epochs', type=int, default=25, metavar='N',
+        parser.add_argument('--epochs', type=int, default=30, metavar='N',
                             help='number of epochs to train (default: 600)')
         parser.add_argument('--start_epoch', type=int, default=1,
                             metavar='N', help='the epoch number to start (default: 1)')
@@ -40,7 +42,7 @@ class Options():
         # tf_efficientnet_b2_ns w/ ArcFace: 0.00001
         # dm_nfnet_f0 w/ cosine-softmax: 0.0003
         # dm_nfnet_f0 w/ ArcFace: 0.00001
-        parser.add_argument('--lr', type=float, default=0.00003, metavar='LR',
+        parser.add_argument('--lr', type=float, default=0.00002, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
