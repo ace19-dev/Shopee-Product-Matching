@@ -114,7 +114,7 @@ def training_augmentation3():
         # A.RandomGamma(p=0.5),
 
         # https://www.kaggle.com/parthdhameliya77/shopee-pytorch-eca-nfnet-l0-image-training
-        A.RandomBrightnessContrast(brightness_limit=(0.09, 0.3), contrast_limit=0.1, p=0.5),
+        A.RandomBrightnessContrast(p=0.5),
         # # A.HueSaturationValue(p=0.5),
         A.ShiftScaleRotate(p=0.5),
         # A.CoarseDropout(max_holes=3, p=0.3),

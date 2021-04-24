@@ -32,28 +32,6 @@ acc_lst_train = []
 acc_lst_val = []
 
 
-# def get_lr(optimizer):
-#     for param_group in optimizer.param_groups:
-#         return param_group["lr"]
-#
-#
-# def freeze_until(net, param_name):
-#     # print([k for k, v in net.named_parameters()])
-#     found_name = False
-#     for name, params in net.named_parameters():
-#         if name == param_name:
-#             found_name = True
-#         params.requires_grad = found_name
-#
-#
-# def freeze_bn(net):
-#     for name, params in net.named_parameters():
-#         if 'bn' in name:
-#             params.requires_grad = False
-#         else:
-#             params.requires_grad = True
-
-
 def main():
     global best_pred, acc_lst_train, acc_lst_val, lr
 
@@ -62,10 +40,10 @@ def main():
     print(args)
 
     scheduler_params = {
-        "lr_start": 2e-5,  # 2e-5
-        "lr_max": 2e-5 * 32,
-        # "lr_max": 2e-5 * 64,
-        "lr_min": 2e-6,  # 2e-6
+        "lr_start": 1e-5,  # 2e-5
+        # "lr_max": 1e-5 * args.batch_size,
+        "lr_max": 1e-5 * 64,
+        "lr_min": 1e-6,  # 2e-6
         "lr_ramp_ep": 5,
         "lr_sus_ep": 0,
         "lr_decay": 0.8,
@@ -213,7 +191,8 @@ def main():
         tokenizer = DistilBertTokenizer.from_pretrained(model_name)
         bert_model = DistilBertModel.from_pretrained(model_name)
     else:
-        model_name = 'cahya/bert-base-indonesian-522M'
+        # model_name = 'cahya/bert-base-indonesian-522M'
+        model_name = 'bert-base-multilingual-cased'
         tokenizer = BertTokenizer.from_pretrained(model_name)
         bert_model = BertModel.from_pretrained(model_name)
     logger.info(tokenizer)
@@ -290,9 +269,9 @@ def main():
         # https://github.com/CoinCheung/pytorch-loss/blob/master/pytorch_loss/taylor_softmax.py
         # criterion = TaylorCrossEntropyLoss(n=6, ignore_index=255, reduction='mean',
         #                                    num_cls=NUM_CLASS, smoothing=0.0)
-        # criterion = torch.nn.CrossEntropyLoss()
+        criterion = torch.nn.CrossEntropyLoss()
         # criterion = LabelSmoothingLoss(NUM_CLASS, smoothing=0.1)
-        criterion = FocalLoss()
+        # criterion = FocalLoss()
         # https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271
         # criterion = FocalCosineLoss()
         # logger.info('\n-------------- loss details --------------')
@@ -364,7 +343,7 @@ def main():
             else:
                 raise RuntimeError("=> no resume checkpoint found at '{}'".format(args.resume))
 
-        start = timeit.default_timer()
+            start = timeit.default_timer()
         for epoch in range(args.start_epoch, args.epochs + 1):
             logger.info('\n\n[%s] ------- Epoch %d -------' % (time.strftime("%Y/%m/%d %H:%M:%S"), epoch))
             train(epoch)

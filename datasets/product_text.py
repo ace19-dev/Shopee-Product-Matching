@@ -1,3 +1,4 @@
+import string
 import numpy as np
 import pandas as pd
 import torch
@@ -17,6 +18,11 @@ def df_loc_by_list(df, key, values):
     return df
 
 
+def removePunctuation(text):
+    punc_translator = str.maketrans(string.punctuation, ' ' * len(string.punctuation))
+    return text.translate(punc_translator)
+
+
 class ProductTextDataset(data.Dataset):
     def __init__(self, data_dir, fold, csv, mode, tokenizer):
         self.data_dir = data_dir
@@ -24,7 +30,7 @@ class ProductTextDataset(data.Dataset):
         self.csv = csv
         self.mode = mode
         self.tokenizer = tokenizer
-        self.max_length = 48
+        self.max_length = 24
         self.num_classes = NUM_CLASS
 
         self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
@@ -34,8 +40,8 @@ class ProductTextDataset(data.Dataset):
         self.df = df_loc_by_list(self.df, 'posting_id', samples)
         self.labels = self.df['label_code'].values
 
-        # TODO: test refine title
-        texts = list(self.df['title'].apply(lambda o: str(o)).values)
+        self.df['title_clean'] = self.df['title'].apply(removePunctuation)
+        texts = list(self.df['title_clean'].apply(lambda o: str(o)).values)
         self.encodings = tokenizer(texts,
                                    padding=True,
                                    truncation=True,

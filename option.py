@@ -18,18 +18,18 @@ class Options():
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
         # model params  tf_efficientnet_b3_ns   resnext101_32x8d
-        # parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
-        #                     help='network model type (default: dm_nfnet_f0)')
-        parser.add_argument('--model', type=str, default='DistilBERT',
+        parser.add_argument('--model', type=str, default='resnest101e',
                             help='network model type (default: dm_nfnet_f0)')
+        # parser.add_argument('--model', type=str, default='DistilBERT',
+        #                     help='network model type (default: dm_nfnet_f0)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
         # parser.add_argument('--widen', type=int, default=4, metavar='N',
         #     help='widen factor of the network (default: 4)')
         # training hyper params
-        parser.add_argument('--batch-size', type=int, default=128,
+        parser.add_argument('--batch-size', type=int, default=32,
                             metavar='N', help='batch size for training (default: 128)')
-        parser.add_argument('--test-batch-size', type=int, default=128,
+        parser.add_argument('--test-batch-size', type=int, default=32,
                             metavar='N', help='batch size for testing (default: 256)')
         parser.add_argument('--epochs', type=int, default=30, metavar='N',
                             help='number of epochs to train (default: 600)')
@@ -89,7 +89,7 @@ class Options():
                             help='hyperparameter beta')
         # parser.add_argument('--cutmix_prob', default=0.5, type=float,
         #                     help='cutmix probability')
-        parser.add_argument('--cutmix_prob', default=0.3, type=float,
+        parser.add_argument('--cutmix_prob', default=0.5, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')

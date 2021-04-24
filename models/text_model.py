@@ -58,6 +58,7 @@ class Model(nn.Module):
     def get_bert_features(self, batch):
         output = self.bert_model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'])
         last_hidden_state = output.last_hidden_state  # shape: (batch_size, seq_length, bert_hidden_dim)
+        # or mean/max pooling
         CLS_token_state = last_hidden_state[:, 0, :]  # obtaining CLS token state which is the first token.
         return CLS_token_state
 

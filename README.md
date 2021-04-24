@@ -31,4 +31,25 @@ Kaggle Competition: Determine if two products are the same by their images
 - find other model through paper
   - use ocr
 
-- 
+- lessoned learn
+  - 왜 infer 할때 마다 embedding 값이 다른가에 대한 이유 -> 잘못 사용한 TTA
+  : 올바른 TTA 사용법.
+  with torch.no_grad():
+        for img,label in tqdm(image_loader): 
+            img = img.cuda()
+            label = label.cuda()
+            batch_size = img.shape[0]
+            
+            # TTA 5
+            TTA = [img, img.flip(-1), img.flip(-2),
+                   img.transpose(-1,-2), img.transpose(-1,-2).flip(-1)]
+            img = torch.stack(TTA, 0)
+            img = img.view(-1, 3, CFG.img_size, CFG.img_size)
+            
+            feat = model(img,label)
+            feat = feat.view(len(TTA), batch_size, -1).mean(0)
+#             feat = feat.view(len(TTA), batch_size, -1).max(0)[0]
+            
+            image_embeddings = feat.detach().cpu().numpy()
+            embeds.append(image_embeddings)
+

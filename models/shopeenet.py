@@ -50,6 +50,11 @@ class ShopeeNet(nn.Module):
             self.backbone.head.fc = nn.Identity()
             # self.backbone.head.global_pool = nn.Identity()
 
+        elif model_name.startswith('resnest'):
+            final_in_features = self.backbone.fc.in_features
+            self.backbone.fc = nn.Identity()
+            # self.backbone.global_pool = nn.Identity()
+
         # self.pooling = nn.AdaptiveAvgPool2d(1)
 
         self.use_fc = use_fc
