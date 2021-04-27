@@ -5,6 +5,14 @@ import torch
 import torch.utils.data as data
 from sklearn.preprocessing import LabelEncoder
 
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+# from nltk.stem.snowball import SnowballStemmer
+# from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
+
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
+
 NUM_CLASS = 11014
 MAX_LENGTH = 30
 
@@ -21,6 +29,32 @@ def df_loc_by_list(df, key, values):
 def removePunctuation(text):
     punc_translator = str.maketrans(string.punctuation, ' ' * len(string.punctuation))
     return text.translate(punc_translator)
+
+
+def clean_text(title_lst):
+    # print('original text: ', text)
+    factory = StemmerFactory()
+    stemmer = factory.create_stemmer()
+
+    nltk.download('punkt')
+    nltk.download('stopwords')
+
+    cleaned_title = []
+    for i, title in enumerate(title_lst):
+        words = word_tokenize(title)
+        clean_words = []
+        for word in words:
+            word = word.lower()
+            if word not in stopwords.words('indonesian'):  # 불용어 제거
+                # stemmer = SnowballStemmer('indonesian')
+                # word = stemmer.stem(word) #어간 추출
+                word = stemmer.stem(word)
+                clean_words.append(word)
+        # print(clean_words)
+        new_title = ' '.join(clean_words)
+        cleaned_title.append(new_title)
+
+    return cleaned_title
 
 
 class ProductTextDataset(data.Dataset):
@@ -40,8 +74,11 @@ class ProductTextDataset(data.Dataset):
         self.df = df_loc_by_list(self.df, 'posting_id', samples)
         self.labels = self.df['label_code'].values
 
-        self.df['title_clean'] = self.df['title'].apply(removePunctuation)
-        texts = list(self.df['title_clean'].apply(lambda o: str(o)).values)
+        # print(stopwords.fileids())
+
+        # self.df['title_clean'] = self.df['title'].apply(removePunctuation)
+        # texts = list(self.df['title_clean'].apply(lambda o: str(o)).values)
+        texts = clean_text(self.df['title'])
         self.encodings = tokenizer(texts,
                                    padding=True,
                                    truncation=True,
