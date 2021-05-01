@@ -132,6 +132,49 @@ def split_train_val(logger):
     '''
 
 
+def train_all(logger):
+    train_df = pd.read_csv(os.path.join(args.source, 'train.csv'))
+    logger.info('total: {}'.format(len(train_df)))
+    logger.info('train shape: {}\n'.format(train_df.shape))
+    # # delete unusual
+    # train_df = train_df.loc[~train_df.filename.isin(
+    #     ["64faf0b221af4767ba8c167b228fde00.jpg", "d946ee19ac1d2997bac5f18ce75656cb.jpg"])].reset_index(drop=True)
+
+    # delete outliers
+    # train_df = train_df[~train_df['image_id'].isin(OUTLIERS)]
+    # logger.info('total:\n', len(train_df), '\n')
+    # delete unusual
+    # train_df = train_df[~train_df['image_id'].isin(UNUSUAL)]
+    # logger.info('total:\n', len(train_df), '\n')
+
+    # 가장 긴 문자열의 길이: 357
+    # https://www.javaer101.com/ko/article/2975648.html
+    # print(train_df.title.map(lambda x: len(x)).max())
+
+    logger.info('unique posting id: {}'.format(len(train_df['posting_id'].unique())))
+    logger.info('unique image: {}'.format(len(train_df['image'].unique())))
+    logger.info('unique image phash: {}'.format(len(train_df['image_phash'].unique())))
+    logger.info('unique title: {}'.format(len(train_df['title'].unique())))
+    logger.info('unique label group: {}'.format(len(train_df['label_group'].unique())))  # 11014
+    logger.info('\n')
+    logger.info('image counts:')
+    logger.info(train_df['image'].value_counts())
+    logger.info('\n\n')
+    # logger.info(train_df['label_group'].astype(int))
+
+    # https://stackoverflow.com/questions/50375985/pandas-add-column-with-value-based-on-condition-based-on-other-columns
+    # train_df['label2'] = np.where(train_df['label'].isin([0, 1, 2, 3]), 1, 0)
+    # train_df.to_csv(os.path.join(args.source, 'train2.csv'), sep=',', na_rep='NaN')
+
+    # # https://www.kaggle.com/underwearfitting/pytorch-densenet-arcface-validation-training
+    # gkf = GroupKFold(n_splits=5)
+    # df_train['fold'] = -1
+    # for fold, (train_idx, valid_idx) in enumerate(gkf.split(df_train, None, df_train.label_group)):
+    #     df_train.loc[valid_idx, 'fold'] = fold
+
+    np.save(args.target + '/train_all_%d.npy' % (len(train_df)), train_df['posting_id'].tolist())
+
+
 # def make_train_npy():
 #     train_df = pd.read_csv(os.path.join(args.source, 'train.csv'))
 #     logger.info('total:\n', len(train_df), '\n')
@@ -180,9 +223,7 @@ def main(args):
     # reference on https://www.kaggle.com/reighns/groupkfold-efficientbnet
     create_labels()
     split_train_val(logger)
-
-    # temp
-    # make_train_npy()
+    # train_all(logger)
 
 
 if __name__ == '__main__':

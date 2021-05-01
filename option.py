@@ -20,7 +20,7 @@ class Options():
         # model params  tf_efficientnet_b3_ns   resnext101_32x8d
         # parser.add_argument('--model', type=str, default='resnest101e',
         #                     help='network model type (default: dm_nfnet_f0)')
-        parser.add_argument('--model', type=str, default='distilbert-base-uncased',
+        parser.add_argument('--model', type=str, default='DistilBERT',
                             help='network model type (default: dm_nfnet_f0)')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')

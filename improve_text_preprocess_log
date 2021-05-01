@@ -1,0 +1,139 @@
+Extracting English embedding
+Extracting Indonesian embedding
+english :
+Found embeddings for 45.00% of vocab
+Found embeddings for  75.83% of all text
+indonesian :
+Found embeddings for 52.66% of vocab
+Found embeddings for  86.20% of all text
+
+**************************
+lower texts
+**************************
+english :
+Found embeddings for 38.75% of vocab
+Found embeddings for  77.78% of all text
+indonesian :
+Found embeddings for 45.94% of vocab
+Found embeddings for  87.69% of all text
+
+**************************
+add words & lower texts
+**************************
+english :
+Added 1643 words to embedding
+indonesian :
+Added 1486 words to embedding
+english :
+Found embeddings for 43.60% of vocab
+Found embeddings for  82.34% of all text
+indonesian :
+Found embeddings for 50.33% of vocab
+Found embeddings for  89.61% of all text
+
+oov_en[:20] [('dompet', 372), ('serbaguna', 343), ('selempang', 297), ('mukena', 283), ('kacamata', 251), ('lengan', 247), ('gantungan', 242), ('terlaris', 241), ('joyko', 239), ('kuas', 236), ('garansi', 227), ('setelan', 221), ('rajut', 216), ('ransel', 194), ('softlens', 194), ('pelindung', 177), ('multifungsi', 175), ('handuk', 172), ('baterai', 171), ('kemasan', 162)]
+oov_id[:20] [('100%', 350), ('//', 115), ('somebymi', 105), ('!!', 98), ('implora', 96), ('[bpom]', 93), ('\\xe2\\x9d\\xa4', 91), ('a3s', 90), ('(cod)', 87), ('[bayar', 80), ('moscrepe', 78), ('(bisa', 77), ('pcs)', 71), ('!!!', 70), ('||', 69), ('[cod]', 68), ('waistbag', 67), ('cod)', 60), ('(1', 59), ('bioaqua', 57)]
+
+**************************
+We use the map to replace contractions
+**************************
+english :
+Found embeddings for 43.60% of vocab
+Found embeddings for  82.34% of all text
+indonesian :
+Found embeddings for 50.34% of vocab
+Found embeddings for  89.61% of all text
+
+**************************
+let us deal with special characters
+**************************
+english :
+_ `
+indonesian :
+`
+english :
+Found embeddings for 59.07% of vocab
+Found embeddings for  87.76% of all text
+indonesian :
+Found embeddings for 68.34% of vocab
+Found embeddings for  94.35% of all text
+
+oov_en[:50] [('dompet', 384), ('serbaguna', 351), ('selempang', 304), ('mukena', 289), ('terlaris', 274), ('x9d', 273), ('kacamata', 262), ('kuas', 253), ('gantungan', 253), ('lengan', 252), ('garansi', 247), ('joyko', 241), ('xe3', 238), ('setelan', 233), ('rajut', 221), ('ransel', 205), ('softlens', 197), ('kemasan', 189), ('pelindung', 186), ('handuk', 181), ('multifungsi', 180), ('baterai', 178), ('xa4', 169), ('timbangan', 166), ('daster', 166), ('gantung', 154), ('edukasi', 150), ('sendok', 139), ('xef', 139), ('hanasui', 139), ('cowok', 138), ('panci', 135), ('piyama', 134), ('x9c', 131), ('serut', 131), ('kantong', 130), ('pulpen', 126), ('bordir', 125), ('kapsul', 123), ('bedak', 120), ('bubuk', 120), ('kerudung', 119), ('kualitas', 117), ('tisu', 117), ('atasan', 117), ('elastis', 116), ('x98', 113), ('berkualitas', 113), ('transparan', 113), ('somebymi', 108)]
+oov_id[:50] [('xe2', 780), ('x9d', 273), ('xe3', 238), ('xa4', 169), ('xef', 139), ('x9c', 131), ('somebymi', 108), ('xf0', 102), ('a3s', 99), ('xb8', 97), ('implora', 96), ('xc2', 86), ('moscrepe', 82), ('x9f', 78), ('waistbag', 71), ('xad', 62), ('x87', 62), ('x90', 61), ('earloop', 58), ('bioaqua', 57), ('x8f', 57), ('beautetox', 57), ('bt21', 55), ('xl26', 51), ('nacific', 50), ('headloop', 49), ('y91', 48), ('tzuki', 48), ('3ply', 48), ('x85', 46), ('y93', 46), ('focallure', 45), ('y12', 45), ('maycreate', 45), ('somethinc', 42), ('morymony', 41), ('truecica', 40), ('acnol', 40), ('iglove', 37), ('popsocket', 36), ('y71', 36), ('maskyourneeds', 36), ('bebwhite', 34), ('x91', 34), ('xc3', 34), ('utbk', 33), ('a10s', 33), ('sasimi', 33), ('mamabear', 32), ('palmerhaus', 32)]
+
+
+***************************
+2nd trial - remove emojjs
+***************************
+Extracting English embedding
+Extracting Indonesian embedding
+english :
+Found embeddings for 45.00% of vocab
+Found embeddings for  75.83% of all text
+indonesian :
+Found embeddings for 52.66% of vocab
+Found embeddings for  86.20% of all text
+
+**************************
+remove emojjs
+**************************
+english :
+Found embeddings for 34.94% of vocab
+Found embeddings for  69.09% of all text
+indonesian :
+Found embeddings for 40.74% of vocab
+Found embeddings for  73.60% of all text
+
+**************************
+lower texts
+**************************
+english :
+Found embeddings for 34.31% of vocab
+Found embeddings for  68.93% of all text
+indonesian :
+Found embeddings for 40.12% of vocab
+Found embeddings for  73.58% of all text
+
+**************************
+add words & lower texts
+**************************
+english :
+Added 1643 words to embedding
+indonesian :
+Added 1486 words to embedding
+english :
+Found embeddings for 36.04% of vocab
+Found embeddings for  69.95% of all text
+indonesian :
+Found embeddings for 40.91% of vocab
+Found embeddings for  73.76% of all text
+
+oov_en[:20] [('urah', 580), ('[]', 576), ('otif', 483), ('epatu', 440), ('()', 424), ('ampu', 364), ('ainan', 333), ('ntuk', 322), ('olos', 311), ('aket', 291), ('otol', 287), ('luetooth', 262), ('engan', 248), ('anjang', 247), ('lastik', 240), ('obil', 234), ('arakter', 226), ('utih', 221), ('ompet', 218), ('embersih', 211)]
+oov_id[:20] [('riginal', 749), ('asker', 609), ('[]', 576), ('()', 424), ('remium', 384), ('erum', 362), ('mport', 340), ('luetooth', 262), ('ortable', 234), ('ompet', 218), ('embersih', 211), ('eadset', 211), ('igital', 211), ('ilikon', 210), ('harger', 206), ('owder', 195), ('oyko', 194), ('amsung', 194), ('//', 191), ('erbaguna', 184)]
+
+**************************
+We use the map to replace contractions
+**************************
+english :
+Found embeddings for 36.04% of vocab
+Found embeddings for  69.95% of all text
+indonesian :
+Found embeddings for 40.92% of vocab
+Found embeddings for  73.76% of all text
+
+**************************
+let us deal with special characters
+**************************
+english :
+_ `
+indonesian :
+`
+english :
+Found embeddings for 46.80% of vocab
+Found embeddings for  76.25% of all text
+indonesian :
+Found embeddings for 53.36% of vocab
+Found embeddings for  79.92% of all text
+
+oov_en[:50] [('urah', 605), ('otif', 491), ('epatu', 448), ('ampu', 370), ('ainan', 340), ('ntuk', 326), ('olos', 321), ('aket', 298), ('otol', 294), ('luetooth', 263), ('anjang', 257), ('engan', 254), ('lastik', 247), ('obil', 241), ('arakter', 230), ('utih', 228), ('ijab', 227), ('ompet', 223), ('eadset', 221), ('inyak', 218), ('embersih', 217), ('ipat', 216), ('harger', 213), ('ilikon', 211), ('owder', 198), ('oyko', 196), ('amsung', 196), ('arphone', 190), ('ahun', 187), ('acamata', 187), ('erbaguna', 186), ('elempang', 181), ('ilbab', 180), ('uslim', 180), ('endek', 178), ('apur', 176), ('antungan', 175), ('ermurah', 164), ('erempuan', 163), ('ihone', 152), ('ayar', 151), ('epeda', 150), ('aransi', 149), ('rosir', 145), ('iquid', 144), ('ewasa', 141), ('efill', 141), ('icro', 140), ('xef', 139), ('anduk', 138)]
+oov_id[:50] [('riginal', 790), ('asker', 622), ('remium', 397), ('erum', 369), ('mport', 347), ('luetooth', 263), ('ortable', 236), ('ompet', 223), ('eadset', 221), ('igital', 218), ('embersih', 217), ('harger', 213), ('ilikon', 211), ('owder', 198), ('oyko', 196), ('amsung', 196), ('ize', 194), ('arphone', 190), ('acamata', 187), ('erbaguna', 186), ('otion', 183), ('elempang', 181), ('ilbab', 180), ('antungan', 175), ('ermurah', 164), ('ihone', 152), ('peaker', 152), ('aransi', 149), ('rosir', 145), ('efill', 141), ('xef', 139), ('eries', 138), ('cne', 138), ('ilicone', 135), ('eauty', 134), ('lektrik', 131), ('oap', 130), ('etelan', 129), ('ukena', 126), ('elindung', 126), ('oklat', 125), ('edmi', 124), ('niversal', 122), ('nstan', 119), ('ipas', 117), ('agic', 116), ('eans', 114), ('osmetik', 113), ('ensil', 113), ('ajut', 113)]

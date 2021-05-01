@@ -27,7 +27,7 @@ from sklearn.svm import LinearSVC
 from sklearn.linear_model import Perceptron
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from sklearn.linear_model import SGDClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
@@ -239,6 +239,8 @@ def main():
     #     'clf__estimator__alpha': (1e-2, 1e-3)
     # }
     # grid_search(x_train, y_train, x_val, y_val, 'label_group', parameters, pipeline)
+
+    model = NearestNeighbors(n_neighbors=100, metric='cosine')
 
 
 if __name__ == '__main__':

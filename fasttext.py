@@ -1,27 +1,25 @@
+import os
+import io
 import re
+import timeit
 import string
-import codecs
-import emoji
-import numpy as np
 import pandas as pd
+import numpy as np
+from tqdm import tqdm
 
-import torch
-import torch.utils.data as data
-from sklearn.preprocessing import LabelEncoder
-
-import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem.snowball import SnowballStemmer
-from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 
-# print(stopwords.fileids())
+from gensim.models import FastText
+from gensim.models.fasttext import load_facebook_model
+from gensim import utils
+from gensim.utils import tokenize
+from gensim.test.utils import datapath
+
+root_dir = '/home/ace19/dl_data/shopee-product-matching'
+
 added_stopwords = ['grosir', 'cod', 'diskon', 'starseller']
-
-NUM_CLASS = 11014
-MAX_LENGTH = 24
-
-# factory = StemmerFactory()
 
 # https://www.kaggle.com/theoviel/improve-your-score-with-some-text-preprocessing/execution?select=embeddings.zip
 punct_mapping = {"‘": "'", "₹": "e", "´": "'", "°": "", "€": "e", "™": "tm", "√": " sqrt ", "×": "x", "²": "2",
@@ -29,7 +27,8 @@ punct_mapping = {"‘": "'", "₹": "e", "´": "'", "°": "", "€": "e", "™":
                  '∞': 'infinity', 'θ': 'theta', '÷': '/', 'α': 'alpha', '•': '.', 'à': 'a', '−': '-', 'β': 'beta',
                  '∅': '', '³': '3', 'π': 'pi', }
 
-punct = "/-'?!.,#$%\'()*+-/:;<=>@[\\]^_`{|}~" + '""“”’' + '∞θ÷α•à−β∅³π‘₹´°£€\×™√²—–&'
+# punct = "/-'?!.,#$%\'()*+-/:;<=>@[\\]^_`{|}~" + '""“”’' + '∞θ÷α•à−β∅³π‘₹´°£€\×™√²—–&'
+punct = "/'?!,#$%\'()*+/:;<=>@[\\]^`{|}" + '""“”’' + '∞θ÷α•à−β∅³π‘₹´°£€\×™√²—–&'
 
 # https://www.utf8-chartable.de/unicode-utf8-table.pl?names=-&utf8=string-literal
 special_characters_mapping = {'\\xc2\\xa1': '¡', '\\xc2\\xa2': '¢', '\\xc2\\xa3': '£', '\\xc2\\xa4': '¤',
@@ -67,11 +66,6 @@ def clean_text(title):
             stemmer = SnowballStemmer('english')
             word = stemmer.stem(word)  # 어간 추출
             clean_words.append(word)
-            # try:
-            #     float(word)
-            # except:
-            #     clean_words.append(word)
-
     # print(clean_words)
     return ' '.join(clean_words)
 
@@ -102,7 +96,7 @@ def build_vocab(texts):
     return vocab
 
 
-# TODO: title 에 맞게 수정 필요.
+# TODO: fix.
 def clean_special_chars(text):
     for p in punct_mapping:
         text = text.replace(p, punct_mapping[p])
@@ -123,12 +117,12 @@ def clean_special_chars(text):
     return text
 
 
-# TODO:
+# TODO: fix
 # https://stackoverflow.com/questions/51217909/removing-all-emojis-from-text
 # def clean_emojjs(text):
 # text2 = repr(text)
 # text3 = codecs.decode(text2, 'unicode_escape')
-# # TODO: how to use below re pattern
+# # TODO: fix
 # emoji_pattern = re.compile("["
 #                            u"\U0001F600-\U0001F64F"  # emoticons
 #                            u"\U0001F300-\U0001F5FF"  # symbols & pictographs
@@ -162,107 +156,85 @@ def clean_emojjs(text):
     return text
 
 
-# def keep_only_alphanumeric_space(text):
-#     return re.sub(r'[^A-Za-z0-9]+', '', text)
+# #######################
+# 1. make corpus file
+# #######################
+# df = pd.read_csv(os.path.join(root_dir, 'train.csv'))
+#
+# df['lowered_title'] = df['title'].apply(lambda x: x.lower())
+# df['clean_special_chars_title'] = df['lowered_title'].apply(lambda x: clean_special_chars(x))
+# df['clean_emojjs_title'] = df['clean_special_chars_title'].apply(lambda x: clean_emojjs(x))
+# df['title_clean'] = df['clean_emojjs_title'].apply(lambda x: clean_text(x))
+#
+# f = open("corpus.txt", 'w')
+# for title in tqdm(df['title_clean'].values.tolist()):
+#     f.write(title+'\n')
+# f.close()
 
 
-def df_loc_by_list(df, key, values):
-    df = df.loc[df[key].isin(values)]
-    df = df.assign(sort=pd.Categorical(df[key], categories=values, ordered=True))
-    df = df.sort_values('sort')
-    # df = df.reset_index()
-    df = df.drop('sort', axis=1)
-    return df
+corpus_file = 'corpus.txt'
+# new_sent = []
+# f = open(corpus_file, 'r')
+# lines = f.readlines()
+# for line in lines:
+#     title = []
+#     for t in line.strip().split(" "):
+#         try:
+#             float(t)
+#         except:
+#             title.append(t)
+#     new_sent.append(title)
+# f.close()
 
 
-class ProductTextDataset(data.Dataset):
-    def __init__(self, data_dir, fold, csv, mode, tokenizer):
-        self.data_dir = data_dir
-        self.fold = fold
-        self.csv = csv
-        self.mode = mode
-        self.tokenizer = tokenizer
-        self.max_length = MAX_LENGTH
-        self.num_classes = NUM_CLASS
-
-        self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f, encoding='utf_8') for f in self.csv])
-        self.preprocess()
-
-        samples = list(np.concatenate([np.load(data_dir + '/fold/%s' % f, allow_pickle=True) for f in self.fold]))
-        self.df = df_loc_by_list(self.df, 'posting_id', samples)
-        self.labels = self.df['label'].values
-
-        self.df['lowered_title'] = self.df['title'].apply(lambda x: x.lower())
-        self.df['clean_special_chars_title'] = self.df['lowered_title'].apply(
-            lambda x: clean_special_chars(x))
-        self.df['clean_emojjs_title'] = self.df['clean_special_chars_title'].apply(lambda x: clean_emojjs(x))
-        self.df['title_clean'] = self.df['clean_emojjs_title'].apply(lambda x: clean_text(x))
-        self.encodings = tokenizer(self.df['title_clean'].values.tolist(),
-                                   padding=True,
-                                   truncation=True,
-                                   max_length=self.max_length)
-
-    def __getitem__(self, index):
-        # putting each tensor in front of the corresponding key from the tokenizer
-        # HuggingFace tokenizers give you whatever you need to feed to the corresponding model
-        item = {key: torch.tensor(values[index]) for key, values in self.encodings.items()}
-        # when testing, there are no targets so we won't do the following
-        item['labels'] = torch.tensor(self.labels[index]).long()
-
-        return item
-
-    def __str__(self):
-        length = len(self)
-
-        string = ''
-        string += '\tmode  = %s\n' % self.mode
-        string += '\tfold = %s\n' % self.fold
-        string += '\tcsv   = %s\n' % str(self.csv)
-        string += '\t\tlen  = %5d\n' % length
-
-        return string
-
-    def __len__(self):
-        return len(self.df)
-
-    def fold_name(self):
-        return self.fold[0].split('_')[1]
-
-    def num_classes(self):
-        return self.num_classes
-
-    def preprocess(self):
-        lbl_encoder = LabelEncoder()
-        self.df['label'] = lbl_encoder.fit_transform(self.df['label_group'])
-
-        self.num_classes = self.df['label'].nunique()
-
-        # https://www.kaggle.com/moeinshariatnia/indonesian-distilbert-finetuning-with-arcmargin
-        # title_lengths = self.df['title'].apply(lambda x: len(x.split(" "))).to_numpy()
-        # print(f"MIN words: {title_lengths.min()}, MAX words: {title_lengths.max()}")
-        # self.max_length = title_lengths.max()
+# ############################
+# train from scratch
+# ############################
+scratch_model = FastText(vector_size=512, window=3, min_count=1)
+scratch_model.build_vocab(corpus_file=corpus_file)  # scan over corpus to build the vocabulary
+total_words = scratch_model.corpus_total_words  # number of words in the corpus
+print('total_words: ', total_words)
+scratch_model.build_vocab(corpus_file=corpus_file)
+scratch_model.train(corpus_file=corpus_file, total_words=total_words, epochs=100)
+print('scratch_model.wv.vectors.shape', scratch_model.wv.vectors.shape)
 
 
-class ProductTextTestDataset(data.Dataset):
-    def __init__(self, data_dir, csv, tokenizer):
-        self.data_dir = data_dir
-        self.csv = csv
-        self.tokenizer = tokenizer
-        self.max_length = 48
-        self.num_classes = NUM_CLASS
+# # ############################
+# # read pre-trained model.
+# # ############################
+# # read pre-trained model.
+# fb_model = load_facebook_model(os.path.join(root_dir, 'word_vectors', 'cc.id.300.bin'))
+# print('fb_model.wv.vectors.shape', fb_model.wv.vectors.shape)
+#
+#
+# # #################################
+# # 3. train from pre-trained model
+# # #################################
+# # new_sent = [['lord', 'of', 'the', 'rings'], ['lord', 'of', 'the', 'flies']]
+# fb_model.build_vocab(corpus_file=corpus_file, update=True)
+# # total_words = fb_model.corpus_total_words  # number of words in the corpus
+# # print('total_words: ', total_words)
+# fb_model.train(corpus_file=corpus_file, total_words=total_words, epochs=100)
+# print('fb_model.wv.vectors.shape', fb_model.wv.vectors.shape)
 
-        self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
-        texts = list(self.df['title'].apply(lambda o: str(o)).values)
-        self.encodings = tokenizer(texts,
-                                   padding=True,
-                                   truncation=True,
-                                   max_length=self.max_length)
 
-    def __getitem__(self, index):
-        # putting each tensor in front of the corresponding key from the tokenizer
-        # HuggingFace tokenizers give you whatever you need to feed to the corresponding model
-        item = {key: torch.tensor(values[index]) for key, values in self.encodings.items()}
-        return item
+# ################################
+# 4. save & load
+# ################################
+fname = 'results/scratch_fasttext.model'
+scratch_model.save(fname)
+# fb_model.save(fname)
+# fb_model = FastText.load(fname)
 
-    def __len__(self):
-        return len(self.df)
+
+# ################################
+# *. test sentence embeddings
+# ################################
+# vect = fb_model.wv['telepon']
+# vect2 = fb_model.wv['Lemonilo']
+# vect3 = fb_model.wv['lampu']
+# sent_vect = [vect, vect2, vect3]
+# vects = np.stack(sent_vect)
+# result = np.mean(vects, axis=0)
+#
+# print('')

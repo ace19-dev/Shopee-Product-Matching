@@ -40,10 +40,10 @@ def main():
     print(args)
 
     scheduler_params = {
-        "lr_start": 1e-5,  # 2e-5
+        "lr_start": 2e-5,  # 2e-5
         # "lr_max": 1e-5 * args.batch_size,
-        "lr_max": 1e-5 * 32,
-        "lr_min": 1e-6,  # 2e-6
+        "lr_max": 2e-5 * 32,
+        "lr_min": 2e-6,  # 2e-6
         "lr_ramp_ep": 5,
         "lr_sus_ep": 0,
         "lr_decay": 0.8,
@@ -199,10 +199,11 @@ def main():
     logger.info('\n')
 
     for train_filename, val_filename in zip(train_npzs, val_npzs):
+    # for train_filename in ['train_all_34250.npy']:
         logger.info('*****************************************')
         logger.info('fold: %s' % (train_filename.split('_')[1]))
         logger.info('train filename: %s' % (train_filename))
-        logger.info('val filename: %s' % (val_filename))
+        # logger.info('val filename: %s' % (val_filename))
         logger.info('*****************************************\n')
 
         best_pred = 0.0
