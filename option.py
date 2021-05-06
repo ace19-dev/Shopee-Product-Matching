@@ -17,21 +17,20 @@ class Options():
                             help='output directory name')
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
-        # model params  tf_efficientnet_b3_ns   resnext101_32x8d
-        # parser.add_argument('--model', type=str, default='resnest101e',
-        #                     help='network model type (default: dm_nfnet_f0)')
-        parser.add_argument('--model', type=str, default='DistilBERT',
+        parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
                             help='network model type (default: dm_nfnet_f0)')
+        # parser.add_argument('--model', type=str, default='DistilBERT',
+        #                     help='network model type')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
         # parser.add_argument('--widen', type=int, default=4, metavar='N',
         #     help='widen factor of the network (default: 4)')
         # training hyper params
-        parser.add_argument('--batch-size', type=int, default=64,
+        parser.add_argument('--batch-size', type=int, default=32,
                             metavar='N', help='batch size for training (default: 128)')
-        parser.add_argument('--test-batch-size', type=int, default=64,
+        parser.add_argument('--test-batch-size', type=int, default=32,
                             metavar='N', help='batch size for testing (default: 256)')
-        parser.add_argument('--epochs', type=int, default=30, metavar='N',
+        parser.add_argument('--epochs', type=int, default=20, metavar='N',
                             help='number of epochs to train (default: 600)')
         parser.add_argument('--start_epoch', type=int, default=1,
                             metavar='N', help='the epoch number to start (default: 1)')
@@ -42,7 +41,9 @@ class Options():
         # tf_efficientnet_b2_ns w/ ArcFace: 0.00001
         # dm_nfnet_f0 w/ cosine-softmax: 0.0003
         # dm_nfnet_f0 w/ ArcFace: 0.00001
-        parser.add_argument('--lr', type=float, default=0.00002, metavar='LR',
+        # parser.add_argument('--lr', type=float, default=0.00002, metavar='LR',
+        #                     help='learning rate (default: 0.1)')
+        parser.add_argument('--lr', type=float, default=0.0003, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
@@ -65,8 +66,8 @@ class Options():
                             default=None,
                             # default='pre-trained/noisy-student-efficientnet-b2.pth',
                             # 'efficientnet-b7_ns_aa-original-mstd0.5_re_100k_v4_cad79a/snapshot_100000.fp16.pth',
-                            # default='experiments/shopee-product-matching/tf_efficientnet_b4_ns/'
-                            #         '(2021-04-18_21:16:40)product_fold1_512x512_tf_efficientnet_b4_ns_acc(35.86861)_loss(10.38755)_checkpoint30.pth.tar',
+                            # default='experiments/shopee-product-matching/tf_efficientnet_b3_ns/'
+                            #         '(2021-05-04_02:29:56)product_fold1_512x512_tf_efficientnet_b3_ns_acc(32.18978)_loss(10.76807)_checkpoint25.pth.tar',
                             help='put the path to resuming file if needed')
         parser.add_argument('--checkpoint_name', type=str, default='product',
                             help='set the checkpoint name')
@@ -85,11 +86,11 @@ class Options():
         # parser.add_argument('--output-path', type=str,
         #                     default='/home/ace19/dl_data/deepfake-detection-challenge/face_datasets/grad-cam',
         #                     help='Input image path')
-        parser.add_argument('--beta', default=0.8, type=float,
+        parser.add_argument('--beta', default=0.5, type=float,
                             help='hyperparameter beta')
         # parser.add_argument('--cutmix_prob', default=0.5, type=float,
         #                     help='cutmix probability')
-        parser.add_argument('--cutmix_prob', default=0.5, type=float,
+        parser.add_argument('--cutmix_prob', default=0.0, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')

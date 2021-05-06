@@ -21,8 +21,8 @@ normalize = Normalize(mean=[0.485, 0.456, 0.406],
 # normalize = Normalize(mean=[0.5, 0.5, 0.5],
 #                       std=[0.5, 0.5, 0.5])
 
-CROP_HEIGHT = 576  # 380
-CROP_WIDTH = 576
+CROP_HEIGHT = 512  # 380
+CROP_WIDTH = 512
 
 # https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/nfnet.py
 TEST_CROP_HEIGHT = 512  # 380
@@ -95,12 +95,13 @@ def training_augmentation3():
 
     train_transform = [
         A.Resize(CROP_HEIGHT, CROP_WIDTH),
-        A.OneOf([
-            A.CenterCrop(TEST_CROP_HEIGHT, TEST_CROP_WIDTH),
-            A.RandomResizedCrop(TEST_CROP_HEIGHT, TEST_CROP_WIDTH)
-        ], p=1.),
+        # A.OneOf([
+        #     A.CenterCrop(TEST_CROP_HEIGHT, TEST_CROP_WIDTH),
+        #     A.RandomResizedCrop(TEST_CROP_HEIGHT, TEST_CROP_WIDTH)
+        # ], p=1.),
         A.Transpose(p=0.5),
         A.HorizontalFlip(),
+        # A.VerticalFlip(),
         # A.OneOf([
         #     A.IAAAdditiveGaussianNoise(),
         #     A.GaussNoise(),
@@ -114,10 +115,10 @@ def training_augmentation3():
         # A.RandomGamma(p=0.5),
 
         # https://www.kaggle.com/parthdhameliya77/shopee-pytorch-eca-nfnet-l0-image-training
-        A.RandomBrightnessContrast(p=0.5),
-        # # A.HueSaturationValue(p=0.5),
-        A.ShiftScaleRotate(p=0.5),
-        # A.CoarseDropout(max_holes=3, p=0.3),
+        A.RandomBrightnessContrast(p=0.3),
+        A.HueSaturationValue(p=0.3),
+        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=120 ,p=0.3),
+        A.CoarseDropout(p=0.3),
         A.Normalize(),
         ToTensorV2(),
     ]

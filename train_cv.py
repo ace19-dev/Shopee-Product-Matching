@@ -133,9 +133,10 @@ def main():
     print(args)
 
     scheduler_params = {
-        "lr_start": 1e-5,   # 2e-5
-        "lr_max": 1e-5 * args.batch_size,
-        "lr_min": 1e-6,     # 2e-6
+        "lr_start": 2e-5,  # 2e-5
+        "lr_max": 2e-5 * args.batch_size,
+        # "lr_max": 2e-6,
+        # "lr_min": 1e-7,     # 2e-6
         "lr_ramp_ep": 5,
         "lr_sus_ep": 0,
         "lr_decay": 0.8,
@@ -338,7 +339,8 @@ def main():
             image_size=IMAGE_SIZE, create_at=create_at, filename=args.checkpoint_name,
             foldname=valset.fold_name())
 
-    for train_filename, val_filename in zip(train_npzs, val_npzs):
+    # for train_filename, val_filename in zip(train_npzs, val_npzs):
+    for train_filename, val_filename in zip(['train_all_34250.npy'], ['valid_fold0_6850.npy']):
         logger.info('****************************')
         logger.info('fold: %s' % (train_filename.split('_')[1]))
         logger.info('train filename: %s' % (train_filename))
@@ -409,7 +411,7 @@ def main():
         # model = M.Model(model_name=args.model, nclass=NUM_CLASS)
         # https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
         model = ShopeeNet(n_classes=NUM_CLASS, model_name=args.model,
-                          use_fc=True, fc_dim=512, dropout=0.1)
+                          use_fc=True, fc_dim=512, dropout=0.2)
         # model.half()  # to save space.
         logger.info('\n-------------- model details --------------')
         print(model)
@@ -513,10 +515,8 @@ def main():
             train(epoch)
             validate(epoch)
 
-        # dist.destroy_process_group()
-
         end = timeit.default_timer()
-        logger.info('trained time:%d' % (int((end - start) / 3600)))
+        logger.info('trained minute:%d' % (int((end - start) / 60)))
         logger.info('%s, training done.\n' % (train_filename.split('_')[1]))
         # logger.info('-------------- Inference Result --------------\n')
 

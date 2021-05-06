@@ -22,109 +22,109 @@ NUM_CLASS = 11014
 MAX_LEN = 38
 
 
-class ProductTextDataset(data.Dataset):
-    def __init__(self, data_dir, fold, csv, mode, tokenizer):
-        self.data_dir = data_dir
-        self.fold = fold
-        self.csv = csv
-        self.mode = mode
-        self.tokenizer = tokenizer
-
-        samples = list(np.concatenate([np.load(data_dir + '/fold/%s' % f, allow_pickle=True) for f in self.fold]))
-        self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
-        self.df = df_loc_by_list(self.df, 'posting_id', samples)
-
-        self.posting_id = self.df['posting_id'].values.tolist()
-
-        self.input_ids = []
-        # https://skimai.com/fine-tuning-bert-for-sentiment-analysis/
-        sentences = self.df['title']
-        # BERT 입력 형식에 맞게 변환
-        for sent in sentences:
-            input_sequence = "[CLS] " + str(sent) + " [SEP]"
-            tokenized_texts = tokenizer.tokenize(input_sequence)
-            tokens = tokenizer.convert_tokens_to_ids(tokenized_texts)
-            tokens += [0] * (MAX_LEN - len(tokens))
-            self.input_ids.append(tokens)
-
-        # sentences = ["[CLS] " + str(s) + " [SEP]" for s in sentences]
-        # tokenized_texts = [tokenizer.tokenize(s) for s in sentences]
-        # # 토큰을 숫자 인덱스로 변환
-        # self.input_ids = [tokenizer.convert_tokens_to_ids(x) for x in tokenized_texts]
-        # # 문장을 MAX_LEN 길이에 맞게 자르고, 모자란 부분을 패딩 0으로 채움
-        # self.input_ids = pad_sequences(self.input_ids, maxlen=MAX_LEN, dtype="long", truncating="post", padding="post")
-
-        self.labels = self.df['label'].values.tolist()  # create 'label' by grouping 'label_group'
-        self.labels = [int(i) for i in self.labels]
-        assert (len(self.input_ids) == len(self.labels))
-
-        self.attention_masks = []
-        # 어텐션 마스크를 패딩이 아니면 1, 패딩이면 0으로 설정
-        # 패딩 부분은 BERT 모델에서 어텐션을 수행하지 않아 속도 향상
-        for seq in self.input_ids:
-            seq_mask = [float(i > 0) for i in seq]
-            self.attention_masks.append(seq_mask)
-
-    def __getitem__(self, index):
-        return torch.tensor(self.input_ids[index]), torch.tensor(self.attention_masks[index]), \
-               torch.tensor(self.labels[index]), self.posting_id[index]
-
-    def __str__(self):
-        length = len(self)
-
-        string = ''
-        string += '\tmode  = %s\n' % self.mode
-        string += '\tfold = %s\n' % self.fold
-        string += '\tcsv   = %s\n' % str(self.csv)
-        string += '\t\tlen  = %5d\n' % length
-
-        return string
-
-    def __len__(self):
-        return len(self.input_ids)
-
-    def fold_name(self):
-        return self.fold[0].split('_')[1]
-
-
-class ProductTextTestDataset(data.Dataset):
-    def __init__(self, data_dir, csv, tokenizer):
-        self.data_dir = data_dir
-        self.csv = csv
-        self.tokenizer = tokenizer
-
-        self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
-        self.posting_id = self.df['posting_id'].values.tolist()
-
-        sentences = self.df['title']
-        # BERT 입력 형식에 맞게 변환
-        for sent in sentences:
-            input_sequence = "[CLS] " + str(sent) + " [SEP]"
-            tokenized_texts = tokenizer.tokenize(input_sequence)
-            tokens = tokenizer.convert_tokens_to_ids(tokenized_texts)
-            tokens += [0] * (MAX_LEN - len(tokens))
-            self.input_ids.append(tokens)
-
-        # sentences = ["[CLS] " + str(s) + " [SEP]" for s in sentences]
-        # tokenized_texts = [tokenizer.tokenize(s) for s in sentences]
-        # # 토큰을 숫자 인덱스로 변환
-        # self.input_ids = [tokenizer.convert_tokens_to_ids(x) for x in tokenized_texts]
-        # # 문장을 MAX_LEN 길이에 맞게 자르고, 모자란 부분을 패딩 0으로 채움
-        # self.input_ids = pad_sequences(self.input_ids, maxlen=MAX_LEN, dtype="long", truncating="post", padding="post")
-
-        self.attention_masks = []
-        # 어텐션 마스크를 패딩이 아니면 1, 패딩이면 0으로 설정
-        # 패딩 부분은 BERT 모델에서 어텐션을 수행하지 않아 속도 향상
-        for seq in self.input_ids:
-            seq_mask = [float(i > 0) for i in seq]
-            self.attention_masks.append(seq_mask)
-
-    def __getitem__(self, index):
-        return torch.tensor(self.input_ids[index]), \
-               torch.tensor(self.attention_masks[index]), self.posting_id[index]
-
-    def __len__(self):
-        return len(self.input_ids)
+# class ProductTextDataset(data.Dataset):
+#     def __init__(self, data_dir, fold, csv, mode, tokenizer):
+#         self.data_dir = data_dir
+#         self.fold = fold
+#         self.csv = csv
+#         self.mode = mode
+#         self.tokenizer = tokenizer
+#
+#         samples = list(np.concatenate([np.load(data_dir + '/fold/%s' % f, allow_pickle=True) for f in self.fold]))
+#         self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
+#         self.df = df_loc_by_list(self.df, 'posting_id', samples)
+#
+#         self.posting_id = self.df['posting_id'].values.tolist()
+#
+#         self.input_ids = []
+#         # https://skimai.com/fine-tuning-bert-for-sentiment-analysis/
+#         sentences = self.df['title']
+#         # BERT 입력 형식에 맞게 변환
+#         for sent in sentences:
+#             input_sequence = "[CLS] " + str(sent) + " [SEP]"
+#             tokenized_texts = tokenizer.tokenize(input_sequence)
+#             tokens = tokenizer.convert_tokens_to_ids(tokenized_texts)
+#             tokens += [0] * (MAX_LEN - len(tokens))
+#             self.input_ids.append(tokens)
+#
+#         # sentences = ["[CLS] " + str(s) + " [SEP]" for s in sentences]
+#         # tokenized_texts = [tokenizer.tokenize(s) for s in sentences]
+#         # # 토큰을 숫자 인덱스로 변환
+#         # self.input_ids = [tokenizer.convert_tokens_to_ids(x) for x in tokenized_texts]
+#         # # 문장을 MAX_LEN 길이에 맞게 자르고, 모자란 부분을 패딩 0으로 채움
+#         # self.input_ids = pad_sequences(self.input_ids, maxlen=MAX_LEN, dtype="long", truncating="post", padding="post")
+#
+#         self.labels = self.df['label'].values.tolist()  # create 'label' by grouping 'label_group'
+#         self.labels = [int(i) for i in self.labels]
+#         assert (len(self.input_ids) == len(self.labels))
+#
+#         self.attention_masks = []
+#         # 어텐션 마스크를 패딩이 아니면 1, 패딩이면 0으로 설정
+#         # 패딩 부분은 BERT 모델에서 어텐션을 수행하지 않아 속도 향상
+#         for seq in self.input_ids:
+#             seq_mask = [float(i > 0) for i in seq]
+#             self.attention_masks.append(seq_mask)
+#
+#     def __getitem__(self, index):
+#         return torch.tensor(self.input_ids[index]), torch.tensor(self.attention_masks[index]), \
+#                torch.tensor(self.labels[index]), self.posting_id[index]
+#
+#     def __str__(self):
+#         length = len(self)
+#
+#         string = ''
+#         string += '\tmode  = %s\n' % self.mode
+#         string += '\tfold = %s\n' % self.fold
+#         string += '\tcsv   = %s\n' % str(self.csv)
+#         string += '\t\tlen  = %5d\n' % length
+#
+#         return string
+#
+#     def __len__(self):
+#         return len(self.input_ids)
+#
+#     def fold_name(self):
+#         return self.fold[0].split('_')[1]
+#
+#
+# class ProductTextTestDataset(data.Dataset):
+#     def __init__(self, data_dir, csv, tokenizer):
+#         self.data_dir = data_dir
+#         self.csv = csv
+#         self.tokenizer = tokenizer
+#
+#         self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f) for f in self.csv])
+#         self.posting_id = self.df['posting_id'].values.tolist()
+#
+#         sentences = self.df['title']
+#         # BERT 입력 형식에 맞게 변환
+#         for sent in sentences:
+#             input_sequence = "[CLS] " + str(sent) + " [SEP]"
+#             tokenized_texts = tokenizer.tokenize(input_sequence)
+#             tokens = tokenizer.convert_tokens_to_ids(tokenized_texts)
+#             tokens += [0] * (MAX_LEN - len(tokens))
+#             self.input_ids.append(tokens)
+#
+#         # sentences = ["[CLS] " + str(s) + " [SEP]" for s in sentences]
+#         # tokenized_texts = [tokenizer.tokenize(s) for s in sentences]
+#         # # 토큰을 숫자 인덱스로 변환
+#         # self.input_ids = [tokenizer.convert_tokens_to_ids(x) for x in tokenized_texts]
+#         # # 문장을 MAX_LEN 길이에 맞게 자르고, 모자란 부분을 패딩 0으로 채움
+#         # self.input_ids = pad_sequences(self.input_ids, maxlen=MAX_LEN, dtype="long", truncating="post", padding="post")
+#
+#         self.attention_masks = []
+#         # 어텐션 마스크를 패딩이 아니면 1, 패딩이면 0으로 설정
+#         # 패딩 부분은 BERT 모델에서 어텐션을 수행하지 않아 속도 향상
+#         for seq in self.input_ids:
+#             seq_mask = [float(i > 0) for i in seq]
+#             self.attention_masks.append(seq_mask)
+#
+#     def __getitem__(self, index):
+#         return torch.tensor(self.input_ids[index]), \
+#                torch.tensor(self.attention_masks[index]), self.posting_id[index]
+#
+#     def __len__(self):
+#         return len(self.input_ids)
 
 
 class ProductDataset(data.Dataset):

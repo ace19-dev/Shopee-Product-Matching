@@ -41,20 +41,12 @@ def main():
 
     scheduler_params = {
         "lr_start": 2e-5,  # 2e-5
-        # "lr_max": 1e-5 * args.batch_size,
-        "lr_max": 2e-5 * 32,
-        "lr_min": 2e-6,  # 2e-6
+        "lr_max": 2e-5 * args.batch_size,
+        # "lr_min": 2e-6,  # 2e-6
         "lr_ramp_ep": 5,
         "lr_sus_ep": 0,
         "lr_decay": 0.8,
     }
-
-    # world_size = int(os.environ['WORLD_SIZE'])
-    # rank = int(os.environ['RANK'])
-    # dist_url = "tcp://{}:{}".format(os.environ["MASTER_ADDR"], os.environ["MASTER_PORT"])
-    # dist.init_process_group(backend='nccl', init_method=dist_url, rank=rank, world_size=world_size)
-    # local_rank = args.local_rank
-    # torch.cuda.set_device(local_rank)
 
     logger, log_file, final_output_dir, tb_log_dir, create_at = create_logger(args, args_desc)
     logger.info('-------------- params --------------')
@@ -191,19 +183,18 @@ def main():
         tokenizer = DistilBertTokenizer.from_pretrained(model_name)
         bert_model = DistilBertModel.from_pretrained(model_name)
     else:
-        # model_name = 'cahya/bert-base-indonesian-522M'
         model_name = 'distilbert-base-uncased'
         tokenizer = BertTokenizer.from_pretrained(model_name)
         bert_model = BertModel.from_pretrained(model_name)
     logger.info(tokenizer)
     logger.info('\n')
 
-    for train_filename, val_filename in zip(train_npzs, val_npzs):
-    # for train_filename in ['train_all_34250.npy']:
+    # for train_filename, val_filename in zip(train_npzs, val_npzs):
+    for train_filename, val_filename in zip(['train_all_34250.npy'], ['valid_fold0_6850.npy']):
         logger.info('*****************************************')
         logger.info('fold: %s' % (train_filename.split('_')[1]))
         logger.info('train filename: %s' % (train_filename))
-        # logger.info('val filename: %s' % (val_filename))
+        logger.info('val filename: %s' % (val_filename))
         logger.info('*****************************************\n')
 
         best_pred = 0.0
@@ -226,15 +217,11 @@ def main():
                                       csv=['train.csv'],
                                       mode='train',
                                       tokenizer=tokenizer)
-        # train_sampler = torch.utils.data.distributed.DistributedSampler(
-        #     trainset, shuffle=True)
         valset = ProductTextDataset(data_dir=args.dataset_root,
                                     fold=[val_filename],
                                     csv=['train.csv'],
                                     mode='val',
                                     tokenizer=tokenizer)
-        # val_sampler = torch.utils.data.distributed.DistributedSampler(
-        #     valset, shuffle=False)
 
         logger.info('\n-------------- dataset --------------')
         logger.info(trainset)
@@ -244,12 +231,10 @@ def main():
                                                    batch_size=args.batch_size,
                                                    num_workers=args.workers,
                                                    sampler=ImbalancedDatasetSampler(trainset),
-                                                   # sampler=train_sampler,
                                                    pin_memory=True,
                                                    drop_last=True)
         val_loader = torch.utils.data.DataLoader(valset,
                                                  batch_size=args.batch_size,
-                                                 # sampler=val_sampler,
                                                  shuffle=False,
                                                  num_workers=args.workers,
                                                  pin_memory=True)
@@ -330,16 +315,8 @@ def main():
                 # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k not in lst}
                 # new_model_dict.update(pretrained_dict)
                 # model.load_state_dict(new_model_dict, strict=False)
-
                 model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-                # https://github.com/pytorch/pytorch/issues/2830
-                if 'optimizer' in checkpoint:
-                    for state in optimizer.state.values():
-                        for k, v in state.items():
-                            if isinstance(v, torch.Tensor):
-                                state[k] = v.cuda()
-                    # optimizer.load_state_dict(checkpoint['optimizer'])
                 print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
             else:
                 raise RuntimeError("=> no resume checkpoint found at '{}'".format(args.resume))
@@ -354,10 +331,8 @@ def main():
             directory = "%s/%s/%s/" % (args.output, 'shopee-product-matching', args.model)
             tokenizer.save_pretrained(directory + '(' + create_at + ')tokenizer')
 
-        # dist.destroy_process_group()
-
         end = timeit.default_timer()
-        logger.info('trained time:%d' % (int((end - start) / 3600)))
+        logger.info('trained minute:%d' % (int((end - start) / 60)))
         logger.info('%s, training done.\n' % (train_filename.split('_')[1]))
         # logger.info('-------------- Inference Result --------------\n')
 
