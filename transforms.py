@@ -99,7 +99,7 @@ def training_augmentation3():
         #     A.CenterCrop(TEST_CROP_HEIGHT, TEST_CROP_WIDTH),
         #     A.RandomResizedCrop(TEST_CROP_HEIGHT, TEST_CROP_WIDTH)
         # ], p=1.),
-        A.Transpose(p=0.5),
+        # A.Transpose(p=0.5),
         A.HorizontalFlip(),
         # A.VerticalFlip(),
         # A.OneOf([
@@ -116,8 +116,8 @@ def training_augmentation3():
 
         # https://www.kaggle.com/parthdhameliya77/shopee-pytorch-eca-nfnet-l0-image-training
         A.RandomBrightnessContrast(p=0.3),
-        A.HueSaturationValue(p=0.3),
-        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=120 ,p=0.3),
+        A.HueSaturationValue(p=0.2),
+        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=45 ,p=0.3),
         A.CoarseDropout(p=0.3),
         A.Normalize(),
         ToTensorV2(),

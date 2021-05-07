@@ -40,8 +40,8 @@ def main():
     print(args)
 
     scheduler_params = {
-        "lr_start": 2e-5,  # 2e-5
-        "lr_max": 2e-5 * args.batch_size,
+        "lr_start": 1e-5,  # 2e-5
+        "lr_max": 1e-5 * args.batch_size,
         # "lr_min": 2e-6,  # 2e-6
         "lr_ramp_ep": 5,
         "lr_sus_ep": 0,

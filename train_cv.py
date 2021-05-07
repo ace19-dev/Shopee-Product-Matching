@@ -397,12 +397,10 @@ def main():
                                                    batch_size=args.batch_size,
                                                    num_workers=args.workers,
                                                    sampler=ImbalancedDatasetSampler(trainset),
-                                                   # sampler=train_sampler,
                                                    pin_memory=True,
                                                    drop_last=True)
         val_loader = torch.utils.data.DataLoader(valset,
                                                  batch_size=args.batch_size,
-                                                 # sampler=val_sampler,
                                                  shuffle=False,
                                                  num_workers=args.workers,
                                                  pin_memory=True)
@@ -411,7 +409,7 @@ def main():
         # model = M.Model(model_name=args.model, nclass=NUM_CLASS)
         # https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
         model = ShopeeNet(n_classes=NUM_CLASS, model_name=args.model,
-                          use_fc=True, fc_dim=512, dropout=0.2)
+                          use_fc=True, fc_dim=512, dropout=0.1)
         # model.half()  # to save space.
         logger.info('\n-------------- model details --------------')
         print(model)

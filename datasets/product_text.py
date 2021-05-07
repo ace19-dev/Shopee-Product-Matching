@@ -19,7 +19,7 @@ from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 # print(stopwords.fileids())
 
 NUM_CLASS = 11014
-MAX_LENGTH = 24
+MAX_LENGTH = 32
 
 # factory = StemmerFactory()
 
