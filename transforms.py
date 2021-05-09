@@ -28,6 +28,7 @@ CROP_WIDTH = 512
 TEST_CROP_HEIGHT = 512  # 380
 TEST_CROP_WIDTH = 512
 
+
 # _, rand_augment, _ = transforms_imagenet_train((CROP_HEIGHT, CROP_WIDTH),
 #                                                auto_augment='original-mstd0.5',
 #                                                separate=True)
@@ -115,9 +116,9 @@ def training_augmentation3():
         # A.RandomGamma(p=0.5),
 
         # https://www.kaggle.com/parthdhameliya77/shopee-pytorch-eca-nfnet-l0-image-training
-        A.RandomBrightnessContrast(p=0.3),
-        A.HueSaturationValue(p=0.2),
-        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=45 ,p=0.3),
+        A.RandomBrightnessContrast(p=0.4),
+        A.HueSaturationValue(p=0.3),
+        A.ShiftScaleRotate(shift_limit=0.0, scale_limit=0.1, rotate_limit=45, p=0.4),
         A.CoarseDropout(p=0.3),
         A.Normalize(),
         ToTensorV2(),

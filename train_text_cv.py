@@ -9,7 +9,7 @@ import pprint
 import timeit
 from tqdm import tqdm
 
-from transformers import BertTokenizer, BertModel, DistilBertTokenizer, DistilBertModel
+from transformers import BertTokenizer, BertModel, DistilBertTokenizer, DistilBertModel, RobertaTokenizer, RobertaModel
 from transformers import get_linear_schedule_with_warmup
 
 from tensorboardX import SummaryWriter
@@ -41,7 +41,7 @@ def main():
 
     scheduler_params = {
         "lr_start": 1e-5,  # 2e-5
-        "lr_max": 1e-5 * args.batch_size,
+        "lr_max": 1e-5 * args.batch_size/2,
         # "lr_min": 2e-6,  # 2e-6
         "lr_ramp_ep": 5,
         "lr_sus_ep": 0,
@@ -51,6 +51,9 @@ def main():
     logger, log_file, final_output_dir, tb_log_dir, create_at = create_logger(args, args_desc)
     logger.info('-------------- params --------------')
     logger.info(pprint.pformat(args.__dict__))
+    logger.info('-------------- scheduler_params --------------')
+    logger.info(pprint.pformat(scheduler_params))
+
 
     writer_dict = {
         'writer': SummaryWriter(tb_log_dir),
@@ -182,10 +185,10 @@ def main():
         model_name = 'cahya/distilbert-base-indonesian'
         tokenizer = DistilBertTokenizer.from_pretrained(model_name)
         bert_model = DistilBertModel.from_pretrained(model_name)
-    else:
-        model_name = 'distilbert-base-uncased'
-        tokenizer = BertTokenizer.from_pretrained(model_name)
-        bert_model = BertModel.from_pretrained(model_name)
+    elif args.model == 'roberta':
+        model_name = 'cahya/roberta-base-indonesian-522M'
+        tokenizer = RobertaTokenizer.from_pretrained(model_name)
+        bert_model = RobertaModel.from_pretrained(model_name)
     logger.info(tokenizer)
     logger.info('\n')
 

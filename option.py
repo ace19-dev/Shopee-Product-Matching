@@ -17,20 +17,20 @@ class Options():
                             help='output directory name')
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
-        parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
-                            help='network model type (default: dm_nfnet_f0)')
-        # parser.add_argument('--model', type=str, default='DistilBERT',
-        #                     help='network model type')
+        # parser.add_argument('--model', type=str, default='efficientnet_b3',
+        #                     help='network model type (default: seresnext50_32x4d)')
+        parser.add_argument('--model', type=str, default='roberta',
+                            help='network model type')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
         # parser.add_argument('--widen', type=int, default=4, metavar='N',
         #     help='widen factor of the network (default: 4)')
         # training hyper params
-        parser.add_argument('--batch-size', type=int, default=32,
+        parser.add_argument('--batch-size', type=int, default=64,
                             metavar='N', help='batch size for training (default: 128)')
-        parser.add_argument('--test-batch-size', type=int, default=32,
+        parser.add_argument('--test-batch-size', type=int, default=64,
                             metavar='N', help='batch size for testing (default: 256)')
-        parser.add_argument('--epochs', type=int, default=20, metavar='N',
+        parser.add_argument('--epochs', type=int, default=35, metavar='N',
                             help='number of epochs to train (default: 600)')
         parser.add_argument('--start_epoch', type=int, default=1,
                             metavar='N', help='the epoch number to start (default: 1)')
@@ -43,7 +43,7 @@ class Options():
         # dm_nfnet_f0 w/ ArcFace: 0.00001
         # parser.add_argument('--lr', type=float, default=0.00002, metavar='LR',
         #                     help='learning rate (default: 0.1)')
-        parser.add_argument('--lr', type=float, default=0.0003, metavar='LR',
+        parser.add_argument('--lr', type=float, default=0.00002, metavar='LR',
                             help='learning rate (default: 0.1)')
         parser.add_argument('--lr-scheduler', type=str, default='cos',
                             help='learning rate scheduler (default: cos)')
@@ -66,8 +66,8 @@ class Options():
                             default=None,
                             # default='pre-trained/noisy-student-efficientnet-b2.pth',
                             # 'efficientnet-b7_ns_aa-original-mstd0.5_re_100k_v4_cad79a/snapshot_100000.fp16.pth',
-                            # default='experiments/shopee-product-matching/tf_efficientnet_b3_ns/'
-                            #         '(2021-05-04_02:29:56)product_fold1_512x512_tf_efficientnet_b3_ns_acc(32.18978)_loss(10.76807)_checkpoint25.pth.tar',
+                            # default='experiments/shopee-product-matching/tf_efficientnet_b4_ns/'
+                            #         '(2021-05-08_01:16:34)product_fold3_512x512_tf_efficientnet_b4_ns_acc(80.22773)_loss(2.70676)_checkpoint11.pth.tar',
                             help='put the path to resuming file if needed')
         parser.add_argument('--checkpoint_name', type=str, default='product',
                             help='set the checkpoint name')
@@ -90,7 +90,7 @@ class Options():
                             help='hyperparameter beta')
         # parser.add_argument('--cutmix_prob', default=0.5, type=float,
         #                     help='cutmix probability')
-        parser.add_argument('--cutmix_prob', default=0.2, type=float,
+        parser.add_argument('--cutmix_prob', default=0.3, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')

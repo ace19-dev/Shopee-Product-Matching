@@ -126,15 +126,15 @@ def clean_special_chars(text):
 # #######################
 # 1. make corpus file
 # #######################
-df = pd.read_csv(os.path.join(root_dir, 'train.csv'))
-
+# df = pd.read_csv(os.path.join(root_dir, 'train.csv'))
+#
 # df['preprocess_title'] = df['title'].apply(lambda x: preprocess_text(x))
-df['title_clean'] = df['title'].apply(lambda x: removePunctuation(x))
-
-f = open("results/corpus.txt", 'w')
-for title in tqdm(df['title_clean'].values.tolist()):
-    f.write(title + '\n')
-f.close()
+# df['title_clean'] = df['preprocess_title'].apply(lambda x: removePunctuation(x))
+#
+# f = open("results/corpus.txt", 'w')
+# for title in tqdm(df['title_clean'].values.tolist()):
+#     f.write(title + '\n')
+# f.close()
 
 corpus_file = 'results/corpus.txt'
 # new_sent = []
@@ -158,34 +158,38 @@ shopee_model = FastText(vector_size=768, seed=8)
 shopee_model.build_vocab(corpus_file=corpus_file)  # scan over corpus to build the vocabulary
 total_words = shopee_model.corpus_total_words  # number of words in the corpus
 print('total_words: ', total_words)
-shopee_model.train(corpus_file=corpus_file, total_words=total_words, epochs=50)
-print('shopee_model.wv.vectors.shape', shopee_model.wv.vectors.shape)
+# shopee_model.train(corpus_file=corpus_file, total_words=total_words, epochs=50)
+# print('shopee_model.wv.vectors.shape', shopee_model.wv.vectors.shape)
 
-# # ############################
-# # read pre-trained model.
-# # ############################
-# # read pre-trained model.
-# fb_model = load_facebook_model(os.path.join(root_dir, 'word_vectors', 'cc.id.300.bin'))
-# print('fb_model.wv.vectors.shape', fb_model.wv.vectors.shape)
-# #
-# #
-# # #################################
-# # 3. train from pre-trained model
-# # #################################
-# # new_sent = [['lord', 'of', 'the', 'rings'], ['lord', 'of', 'the', 'flies']]
-# fb_model.build_vocab(corpus_file=corpus_file, update=True)
-# # total_words = fb_model.corpus_total_words  # number of words in the corpus
-# # print('total_words: ', total_words)
-# fb_model.train(corpus_file=corpus_file, total_words=total_words, epochs=80)
-# print('fb_model.wv.vectors.shape', fb_model.wv.vectors.shape)
+# ############################
+# read pre-trained model.
+# ############################
+# read pre-trained model.
+fb_model = load_facebook_model(os.path.join(root_dir, 'word_vectors', 'cc.id.300.bin'))
+print('fb_model.wv.vectors.shape', fb_model.wv.vectors.shape)
+#
+#
+# #################################
+# 3. train from pre-trained model
+# #################################
+# new_sent = [['lord', 'of', 'the', 'rings'], ['lord', 'of', 'the', 'flies']]
+fb_model.build_vocab(corpus_file=corpus_file, update=True)
+# total_words = fb_model.corpus_total_words  # number of words in the corpus
+# print('total_words: ', total_words)
+fb_model.train(corpus_file=corpus_file, total_words=total_words, epochs=50)
+print('fb_model.wv.vectors.shape', fb_model.wv.vectors.shape)
+# >> (2000000, 300)
 
 
 # ################################
 # 4. save & load
 # ################################
+# fname = 'results/shopee_fasttext.model'
+# shopee_model.save(fname)
+
 fname = 'results/fb_shopee_fasttext.model'
-shopee_model.save(fname)
-# fb_model.save(fname)
+fb_model.save(fname)
+
 # fb_model = FastText.load(fname)
 
 

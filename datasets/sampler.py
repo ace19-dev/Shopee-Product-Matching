@@ -41,8 +41,8 @@ class ImbalancedDatasetSampler(torch.utils.data.sampler.Sampler):
 
     def _get_label(self, dataset, idx):
         dataset_type = type(dataset)
-        if dataset_type is datasets.product.ProductDataset:
-        # if dataset_type is datasets.product_text.ProductTextDataset:
+        # if dataset_type is datasets.product.ProductDataset:
+        if dataset_type is datasets.product_text.ProductTextDataset:
         # if dataset_type is datasets.product_text.WordVectorDataset:
             return dataset.labels[idx]
         else:

@@ -153,6 +153,8 @@ def main():
         create_logger(args, args_desc, IMAGE_SIZE)
     logger.info('-------------- params --------------')
     logger.info(pprint.pformat(args.__dict__))
+    logger.info('-------------- scheduler_params --------------')
+    logger.info(pprint.pformat(scheduler_params))
 
     writer_dict = {
         'writer': SummaryWriter(tb_log_dir),
@@ -409,7 +411,7 @@ def main():
         # model = M.Model(model_name=args.model, nclass=NUM_CLASS)
         # https://www.kaggle.com/tanulsingh077/pytorch-metric-learning-pipeline-only-images
         model = ShopeeNet(n_classes=NUM_CLASS, model_name=args.model,
-                          use_fc=True, fc_dim=512, dropout=0.1)
+                          use_fc=True, fc_dim=512, dropout=0.0)
         # model.half()  # to save space.
         logger.info('\n-------------- model details --------------')
         print(model)
@@ -481,12 +483,14 @@ def main():
                 best_pred = checkpoint['best_pred']
                 acc_lst_train = checkpoint['acc_lst_train']
                 acc_lst_val = checkpoint['acc_lst_val']
-                not_to_be_applied = ['module.backbone.classifier.weight',
-                                     'module.backbone.classifier.bias',
-                                     'module.cosine_softmax.weights',
-                                     'module.cosine_softmax.scale',
-                                     'module.cosine_softmax.fc.weight',
-                                     'module.cosine_softmax.fc.bias'
+                not_to_be_applied = ['module.fc.weight',
+                                     'module.fc.bias',
+                                     'module.bn.weights',
+                                     'module.bn.bias',
+                                     'module.bn.running_mean',
+                                     'module.bn.running_var',
+                                     'module.bn.num_batches_tracked',
+                                     'module.final.weight'
                                      ]
                 pretrained_dict = checkpoint['state_dict']
                 new_model_dict = model.state_dict()
@@ -495,14 +499,6 @@ def main():
                 model.load_state_dict(new_model_dict, strict=False)
 
                 # model.load_state_dict(checkpoint['state_dict'], strict=False)
-
-                # https://github.com/pytorch/pytorch/issues/2830
-                if 'optimizer' in checkpoint:
-                    for state in optimizer.state.values():
-                        for k, v in state.items():
-                            if isinstance(v, torch.Tensor):
-                                state[k] = v.cuda()
-                    # optimizer.load_state_dict(checkpoint['optimizer'])
                 print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
             else:
                 raise RuntimeError("=> no resume checkpoint found at '{}'".format(args.resume))
