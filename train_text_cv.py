@@ -10,6 +10,9 @@ import timeit
 from tqdm import tqdm
 
 from transformers import BertTokenizer, BertModel, DistilBertTokenizer, DistilBertModel, RobertaTokenizer, RobertaModel
+from transformers import XLMRobertaTokenizer, XLMRobertaModel
+# from transformers import XLMRobertaForSequenceClassification
+from transformers import AdamW
 from transformers import get_linear_schedule_with_warmup
 
 from tensorboardX import SummaryWriter
@@ -18,7 +21,7 @@ from tensorboardX import SummaryWriter
 # import transforms
 from models import text_model as M
 from datasets.product_text import ProductTextDataset, NUM_CLASS
-from datasets.sampler import ImbalancedDatasetSampler
+from datasets.sampler import BalanceClassSampler, ImbalancedDatasetSampler
 from option import Options
 from training.losses import FocalLoss
 from training.lr_scheduler import *
@@ -40,8 +43,10 @@ def main():
     print(args)
 
     scheduler_params = {
-        "lr_start": 1e-5,  # 2e-5
-        "lr_max": 1e-5 * args.batch_size/2,
+        "lr_start": 1e-5,
+        "lr_max": 1e-4,     # roberta
+        # "lr_start": 2e-5,
+        # "lr_max": 2e-5 * args.batch_size/2,     # DistilBert
         # "lr_min": 2e-6,  # 2e-6
         "lr_ramp_ep": 5,
         "lr_sus_ep": 0,
@@ -71,8 +76,6 @@ def main():
     def train(epoch):
         global best_pred, acc_lst_train, acc_lst_val
 
-        local_step = 0
-
         loss_score = AverageMeter()
         acc_score = AverageMeter()
 
@@ -85,10 +88,7 @@ def main():
 
             batch = {k: v.cuda() for k, v in batch.items()}
             # if args.cuda:
-            #     input_ids, input_mask, labels = \
-            #         input_ids.cuda(), input_mask.cuda(), labels.cuda()
-
-            local_step += 1
+            #     input_ids, att_mask = batch[0].cuda(), batch[1].cuda()
 
             # ArcFace
             preds = model(batch)
@@ -98,7 +98,9 @@ def main():
             #                  t1=0.5, t2=1.5)
             optimizer.zero_grad()
             loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            # Clip the norm of the gradients to 1.0.
+            # This is to help prevent the "exploding gradients" problem.
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
             # scheduler.step()
 
@@ -189,7 +191,19 @@ def main():
         model_name = 'cahya/roberta-base-indonesian-522M'
         tokenizer = RobertaTokenizer.from_pretrained(model_name)
         bert_model = RobertaModel.from_pretrained(model_name)
-    logger.info(tokenizer)
+    elif args.model == 'xlm-roberta-base':
+        # https://www.kaggle.com/vbookshelf/basics-of-bert-and-xlm-roberta-pytorch#Section-1
+        model_name = 'xlm-roberta-base'
+        tokenizer = XLMRobertaTokenizer.from_pretrained(model_name)
+        bert_model = XLMRobertaModel.from_pretrained(model_name)
+        # print('bos_token_id <s>:', tokenizer.bos_token_id)
+        # print('eos_token_id </s>:', tokenizer.eos_token_id)
+        # print('sep_token_id </s>:', tokenizer.sep_token_id)
+        # print('pad_token_id <pad>:', tokenizer.pad_token_id)
+
+    logger.info('Model Type: %s' % model_name)
+    logger.info('Check the vocab size: %d' % tokenizer.vocab_size)
+    logger.info('What are the special tokens: %s' % tokenizer.special_tokens_map)
     logger.info('\n')
 
     # for train_filename, val_filename in zip(train_npzs, val_npzs):
@@ -234,6 +248,8 @@ def main():
                                                    batch_size=args.batch_size,
                                                    num_workers=args.workers,
                                                    sampler=ImbalancedDatasetSampler(trainset),
+                                                   # sampler=BalanceClassSampler(labels=trainset.get_labels()),
+                                                   shuffle=True,
                                                    pin_memory=True,
                                                    drop_last=True)
         val_loader = torch.utils.data.DataLoader(valset,
@@ -271,11 +287,11 @@ def main():
         #                             lr=args.lr,
         #                             momentum=args.momentum, weight_decay=args.weight_decay)
         # https://github.com/clovaai/AdamP
-        from adamp import AdamP
-        optimizer = AdamP(model.parameters(), lr=scheduler_params['lr_start'],
-                          betas=(0.9, 0.999), weight_decay=args.weight_decay)
-        # optimizer = AdamP(model.parameters(), lr=args.lr, betas=(0.9, 0.999),
-        #                   weight_decay=args.weight_decay)
+        # from adamp import AdamP
+        # optimizer = AdamP(model.parameters(), lr=scheduler_params['lr_start'],
+        #                   betas=(0.9, 0.999), weight_decay=args.weight_decay)
+        optimizer = AdamW(model.parameters(), lr=args.lr, betas=(0.9, 0.999),
+                          weight_decay=args.weight_decay)
         logger.info(optimizer.__str__())
 
         # optimizer = Lookahead(optimizer)

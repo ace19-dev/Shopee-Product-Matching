@@ -179,6 +179,9 @@ class ProductDataset(data.Dataset):
     #
     #     return string
 
+    def get_labels(self):
+        return self.labels
+
     def __len__(self):
         return len(self.images)
 

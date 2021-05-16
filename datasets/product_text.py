@@ -149,6 +149,36 @@ def clean_special_chars(text):
 #     return emoji_pattern.sub(r'', text)
 
 
+# sample of pre-processing
+# from https://www.kaggle.com/ruchi798/commonlit-readability-prize-eda-baseline
+def preprocess(data):
+    excerpt_processed = []
+    # for e in data['excerpt']:
+
+    # find alphabets
+    e = re.sub("[^a-zA-Z]", " ", data)
+
+    # convert to lower case
+    e = e.lower()
+
+    # tokenize words
+    e = nltk.word_tokenize(e)
+
+    # remove stopwords
+    e = [word for word in e if not word in set(stopwords.words("english"))]
+
+    # lemmatization
+    lemma = nltk.WordNetLemmatizer()
+    e = [lemma.lemmatize(word) for word in e]
+    e = " ".join(e)
+
+    # excerpt_processed.append(e)
+
+    # return excerpt_processed
+
+    return e
+
+
 def df_loc_by_list(df, key, values):
     df = df.loc[df[key].isin(values)]
     df = df.assign(sort=pd.Categorical(df[key], categories=values, ordered=True))
@@ -165,7 +195,6 @@ class ProductTextDataset(data.Dataset):
         self.csv = csv
         self.mode = mode
         self.tokenizer = tokenizer
-        self.max_length = MAX_LENGTH
         self.num_classes = NUM_CLASS
 
         self.df = pd.concat([pd.read_csv(data_dir + '/%s' % f, encoding='utf_8') for f in self.csv])
@@ -180,7 +209,7 @@ class ProductTextDataset(data.Dataset):
         self.encodings = tokenizer(self.df['title_clean'].values.tolist(),
                                    padding=True,
                                    truncation=True,
-                                   max_length=self.max_length)
+                                   max_length=MAX_LENGTH)
 
     def __getitem__(self, index):
         # putting each tensor in front of the corresponding key from the tokenizer
@@ -191,16 +220,25 @@ class ProductTextDataset(data.Dataset):
 
         return item
 
-    def __str__(self):
-        length = len(self)
-
-        string = ''
-        string += '\tmode  = %s\n' % self.mode
-        string += '\tfold = %s\n' % self.fold
-        string += '\tcsv   = %s\n' % str(self.csv)
-        string += '\t\tlen  = %5d\n' % length
-
-        return string
+        # sentence1 = self.df.loc[index, 'title_clean']
+        #
+        # self.encodings = self.tokenizer.encode_plus(
+        #     sentence1,  # Sentences to encode.
+        #     add_special_tokens=True,  # Add the special tokens.
+        #     max_length=MAX_LENGTH,  # Pad & truncate all sentences.
+        #     padding=True,
+        #     return_attention_mask=True,  # Construct attn. masks.
+        #     return_tensors='pt',  # Return pytorch tensors.
+        # )
+        #
+        # padded_token_list = self.encodings['input_ids'][0]
+        # att_mask = self.encodings['attention_mask'][0]
+        # # Convert the target to a torch tensor
+        # target = torch.tensor(self.df.loc[index, 'label'])
+        #
+        # sample = (padded_token_list, att_mask, target)
+        #
+        # return sample
 
     def __len__(self):
         return len(self.df)

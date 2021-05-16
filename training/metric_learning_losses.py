@@ -113,7 +113,10 @@ class AddMarginProduct(nn.Module):
 
     def forward(self, input, label):
         # --------------------------- cos(theta) & phi(theta) ---------------------------
-        cosine = F.linear(F.normalize(input), F.normalize(self.weight))
+        # cosine = F.linear(F.normalize(input), F.normalize(self.weight))
+        # # https://www.kaggle.com/c/shopee-product-matching/discussion/238136
+        # normalize -> concat img_emb & txt_emb
+        cosine = F.linear(input, F.normalize(self.weight))
         phi = cosine - self.m
         # --------------------------- convert label to one-hot ---------------------------
         one_hot = torch.zeros(cosine.size(), device='cuda')

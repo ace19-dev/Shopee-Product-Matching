@@ -17,9 +17,9 @@ class Options():
                             help='output directory name')
         parser.add_argument('--dataset', type=str, default='product',
                             help='training dataset')
-        # parser.add_argument('--model', type=str, default='efficientnet_b3',
-        #                     help='network model type (default: seresnext50_32x4d)')
-        parser.add_argument('--model', type=str, default='roberta',
+        # parser.add_argument('--model', type=str, default='tf_efficientnet_b4_ns',
+        #                     help='network model type (default: efficientnet_b3)')
+        parser.add_argument('--model', type=str, default='xlm-roberta-base',
                             help='network model type')
         parser.add_argument('--pretrained', action='store_true',
                             default=False, help='load pretrianed mode')
@@ -30,7 +30,7 @@ class Options():
                             metavar='N', help='batch size for training (default: 128)')
         parser.add_argument('--test-batch-size', type=int, default=64,
                             metavar='N', help='batch size for testing (default: 256)')
-        parser.add_argument('--epochs', type=int, default=35, metavar='N',
+        parser.add_argument('--epochs', type=int, default=30, metavar='N',
                             help='number of epochs to train (default: 600)')
         parser.add_argument('--start_epoch', type=int, default=1,
                             metavar='N', help='the epoch number to start (default: 1)')
@@ -86,11 +86,11 @@ class Options():
         # parser.add_argument('--output-path', type=str,
         #                     default='/home/ace19/dl_data/deepfake-detection-challenge/face_datasets/grad-cam',
         #                     help='Input image path')
-        parser.add_argument('--beta', default=0.6, type=float,
+        parser.add_argument('--beta', default=0.5, type=float,
                             help='hyperparameter beta')
         # parser.add_argument('--cutmix_prob', default=0.5, type=float,
         #                     help='cutmix probability')
-        parser.add_argument('--cutmix_prob', default=0.3, type=float,
+        parser.add_argument('--cutmix_prob', default=0.2, type=float,
                             help='cutmix probability')
         parser.add_argument('--alpha', default=0.8, type=float,
                             help='mixup interpolation coefficient (default: 1)')

@@ -53,3 +53,10 @@ Kaggle Competition: Determine if two products are the same by their images
             image_embeddings = feat.detach().cpu().numpy()
             embeds.append(image_embeddings)
 
+# Wrapup
+- https://www.kaggle.com/c/shopee-product-matching/discussion/238033?sort=published 참고할 것.
+- The best trick in any competition is to analyze your OOF from your CV. 
+After doing lots of OOF EDA, i discovered that my simple boundary wasn't getting as many matches as it could.
+Ask yourself questions like "what probability does a product need to be in order to include and increase 
+F1 metric?", next ask yourself, "can i compute probabilities of matches from my OOF?". 
+Afterward you have a matrix of probabilities and it is clear that your decision boundary can be improved.

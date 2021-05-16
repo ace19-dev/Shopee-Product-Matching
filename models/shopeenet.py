@@ -99,6 +99,8 @@ class ShopeeNet(nn.Module):
             x = self.dropout(x)
             x = self.fc(x)
             x = self.bn(x)
+            # https://www.kaggle.com/c/shopee-product-matching/discussion/238136
+            x = F.normalize(x, p=2, dim=1)
 
         return x
 

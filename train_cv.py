@@ -24,7 +24,7 @@ import transforms
 from models import model as M
 from models.shopeenet import ShopeeNet
 from datasets.product import ProductDataset, NUM_CLASS
-from datasets.sampler import ImbalancedDatasetSampler
+from datasets.sampler import ImbalancedDatasetSampler, BalanceClassSampler
 from option import Options
 from training.lr_scheduler import *
 from training.losses import FocalLoss
@@ -398,7 +398,8 @@ def main():
         train_loader = torch.utils.data.DataLoader(trainset,
                                                    batch_size=args.batch_size,
                                                    num_workers=args.workers,
-                                                   sampler=ImbalancedDatasetSampler(trainset),
+                                                   # sampler=ImbalancedDatasetSampler(trainset),
+                                                   sampler=BalanceClassSampler(labels=trainset.get_labels()),
                                                    pin_memory=True,
                                                    drop_last=True)
         val_loader = torch.utils.data.DataLoader(valset,
